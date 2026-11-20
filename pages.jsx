@@ -3,7 +3,7 @@ import { Ic } from "./icons.jsx";
 import { ART } from "./assets.js";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, updateProfile } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, updateDoc, query, where, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, updateDoc, increment, query, where, serverTimestamp } from "firebase/firestore";
 import { auth, db, google } from "./firebase";
 import { ADMIN_EMAIL } from "./firebaseConfig";
 import { VILLES, CATEGORIES, PAYS, EQUIP, fmt, t } from "./data";
@@ -22,7 +22,7 @@ function ShopCard({ s }) {
         {s.premium && <span className="prem"><Ic n="crown" /> PREMIUM</span>}
         <div className="glass info"><b>{s.nom}{s.premium && " • PREMIUM"}</b>
           <div>{s.categorie} • {s.quartier}, {s.ville}</div>
-          <div className="meta">{s.description?.slice(0, 50)}{s.dispo && <span><span className="dot" />Disponible maintenant</span>}</div></div>
+          <div className="meta">{s.noteCount ? <span><Ic n="star" /> {(s.noteSum / s.noteCount).toFixed(1)} • {s.noteCount} avis</span> : "Nouveau"}{s.dispo && <span> <span className="dot" />Disponible maintenant</span>}</div></div>
       </Link>
       <div className="row"><a className="btn-g" href={"tel:" + s.whatsapp}><Ic n="phone" /> Appeler</a><a className="btn-g wa" href={waLink(s.whatsapp)} target="_blank" rel="noreferrer">WhatsApp</a></div>
     </div>
@@ -128,6 +128,7 @@ export function ShopPage({ user }) {
     if (!user) return alert("Connecte-toi pour donner ton avis.");
     const ver = !(await getDocs(query(collection(db, "orders"), where("clientId", "==", user.uid), where("shopId", "==", id), where("statut", "==", "livree")))).empty;
     await addDoc(collection(db, "shops", id, "reviews"), { userId: user.uid, auteur: user.displayName || "Client", verifie: ver, etoiles: Number(r.etoiles), commentaire: r.commentaire, date: serverTimestamp() });
+    try { await updateDoc(doc(db, "shops", id), { noteSum: increment(Number(r.etoiles)), noteCount: increment(1) }); } catch {}
     setR({ etoiles: 5, commentaire: "" }); load();
   };
 
@@ -136,24 +137,24 @@ export function ShopPage({ user }) {
       <div className="cover" style={shop.photo ? { backgroundImage: "url(" + shop.photo + ")" } : undefined}>
         <div className="topbar"><button className="rb" onClick={() => nav(-1)}><Ic n="back" /></button><span className="glass titlebar">Boutique</span><button className="rb" onClick={() => (navigator.share ? navigator.share({ title: shop.nom, url: location.href }) : navigator.clipboard?.writeText(location.href))}><Ic n="share" /></button></div>
       </div>
+      <div className="shop-head">
+        <Avatar s={shop} />
+        <div className="glass head-info"><h2>{shop.nom}</h2>{shop.premium && <span className="badge"><Ic n="sparkle" /> PREMIUM</span>}<div className="meta"><Ic n="pin" /> {shop.quartier} • {shop.ville} • {shop.categorie}</div></div>
+      </div>
+      <div className="row three">
+        <a className="btn-g" href={"tel:" + shop.whatsapp}><Ic n="phone" /> Appeler</a>
+        <a className="btn-g wa" href={waLink(shop.whatsapp)} target="_blank" rel="noreferrer"><Ic n="whatsapp" /> WhatsApp</a>
+        {!mine && user ? <Link className="btn-g" to={"/chat/" + id + "/" + user.uid}><Ic n="chat" /> Écrire</Link> : <button className="btn-g" onClick={toggleFav}><Ic n="heart" fill={fav} /> Favori</button>}
+      </div>
       <div className="card">
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          <div className="shop"><Avatar s={shop} />
-            <div><h2 style={{ margin: 0 }}>{shop.nom}</h2>
-              <div className="meta">{shop.categorie} • {shop.quartier}, {shop.ville}</div>
-              <div>{shop.premium && <span className="badge">PREMIUM</span>} {moy && <span><span className="star">★</span> {moy} ({reviews.length})</span>}</div>
-            </div></div>
-          <button className={"heart" + (fav ? " on" : "")} onClick={toggleFav} aria-label="Favori"><Ic n="heart" fill={fav} /></button>
+        <div className="row between">
+          <div>{moy && <b><span className="star">★</span> {moy} • {reviews.length} avis</b>} {shop.dispo && <span className="meta"><span className="dot" />Disponible maintenant</span>}</div>
+          {!mine && <button className={"heart" + (fav ? " on" : "")} onClick={toggleFav} aria-label="Favori"><Ic n="heart" fill={fav} /></button>}
         </div>
         <p>{shop.description}</p>
         {shop.horaires && <div className="meta">Horaires : {shop.horaires}</div>}
-        <div className="row" style={{ marginTop: 10 }}>
-          <a className="btn" href={"tel:" + shop.whatsapp}>Appeler</a>
-          <a className="btn wa" href={waLink(shop.whatsapp)} target="_blank" rel="noreferrer">WhatsApp</a>
-          {!mine && user && <Link className="btn line" to={"/chat/" + id + "/" + user.uid}><Ic n="chat" /> Écrire</Link>}
-        </div>
+        {mine && <button className={"chip" + (shop.dispo ? " on" : "")} style={{ marginTop: 10 }} onClick={async () => { await updateDoc(doc(db, "shops", id), { dispo: !shop.dispo }); load(); }}>Disponible maintenant : {shop.dispo ? "OUI" : "NON"}</button>}
       </div>
-
       {mine && <StoryAdd shop={shop} />}
       <h2>Produits et services</h2>
       {products.length === 0 && <div className="card center"><img className="art pipe" src={ART.pipe} alt="" /><b>Aucun produit pour le moment</b><div className="meta">Ce commerçant n'a pas encore ajouté de produits ou services. Revenez bientôt !</div></div>}
@@ -183,13 +184,14 @@ export function ShopPage({ user }) {
       {reviews.map((x) => (
         <div className="card" key={x.id}><b>{x.auteur}</b>{x.verifie && <span className="ok"> <Ic n="check" /> Vérifié</span>} <span className="star">{"★".repeat(x.etoiles)}</span><div className="meta">{x.commentaire}</div></div>
       ))}
-      <form className="card" onSubmit={addReview}>
-        <select value={r.etoiles} onChange={(e) => setR({ ...r, etoiles: e.target.value })}>
-          {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n} étoile{n > 1 ? "s" : ""}</option>)}
-        </select>
-        <input placeholder="Ton avis" value={r.commentaire} onChange={(e) => setR({ ...r, commentaire: e.target.value })} />
-        <button className="btn">Publier mon avis</button>
-      </form>
+      <div className="card">
+        <div className="row between"><span className="chip">Évaluation globale</span><b className="star">{moy || "—"} {[1, 2, 3, 4, 5].map((n) => <Ic key={n} n="star" fill={n <= Math.round(moy || 0)} />)}</b></div>
+        <form onSubmit={addReview}>
+          <div className="center"><b>Donnez votre avis</b><div>{[1, 2, 3, 4, 5].map((n) => <button type="button" key={n} className={"star-btn" + (r.etoiles >= n ? " on" : "")} onClick={() => setR({ ...r, etoiles: n })}><Ic n="star" fill={r.etoiles >= n} /></button>)}</div></div>
+          <input placeholder="Ton avis" value={r.commentaire} onChange={(e) => setR({ ...r, commentaire: e.target.value })} />
+          <button className="btn big">Publier mon avis</button>
+        </form>
+      </div>
     </div>
   );
 }
