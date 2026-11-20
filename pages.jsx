@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Ic } from "./icons.jsx";
-import { ART } from "./assets.js";
+import { ART, ORB } from "./assets.js";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, updateProfile } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, updateDoc, increment, query, where, serverTimestamp } from "firebase/firestore";
 import { auth, db, google } from "./firebase";
 import { ADMIN_EMAIL } from "./firebaseConfig";
-import { VILLES, CATEGORIES, PAYS, EQUIP, fmt, t } from "./data";
-import { Avatar, compress, voice, Price, orderProduct, StoriesBar, StoryAdd, km } from "./extra.jsx";
+import { VILLES, CATEGORIES, PAYS, EQUIP, CHAMPS, fmt, t } from "./data";
+import { Avatar, compress, voice, Price, orderProduct, StoriesBar, StoryAdd, km, PremiumCard, gps } from "./extra.jsx";
 
 const initial = (s) => (s || "?").trim().charAt(0).toUpperCase();
 const waLink = (n) => "https://wa.me/" + String(n || "").replace(/\D/g, "");
@@ -63,7 +63,7 @@ export function Home({ user }) {
         <Link to={user ? "/profil" : "/connexion"} className="ava-ring"><span className="c">{user?.photoURL ? <img src={user.photoURL} alt="" /> : (prenom || "?")[0].toUpperCase()}</span><i className="bolt"><Ic n="bolt" /></i>{prenom || "Se connecter"}</Link>
       </div>
       <div className="glass pill"><span><Ic n="search" /></span><input placeholder="Rechercher un service…" value={q} onChange={(e) => setQ(e.target.value)} /><button className="mic" onClick={() => voice(setQ)}><Ic n="mic" /><small>Voix</small></button></div>
-      <div className="orbs"><Link to="/taxi" className="orb"><Ic n="car" /><b>Taxi</b></Link><Link to="/livraison" className="orb"><Ic n="box" /><b>Livraison</b></Link><Link to="/urgence" className="orb sos"><Ic n="shield" /><b>Urgence SOS</b></Link></div>
+      <div className="orbs">{[["/taxi", "taxi", "Taxi"], ["/livraison", "box", "Livraison"], ["/urgence", "sos", "Urgence SOS"]].map(([to, k, l]) => <Link key={to} to={to} className="orb-img" aria-label={l}><img src={ORB[k]} alt={l} /></Link>)}</div>
       <StoriesBar />
       <h2>Catégories</h2>
       <div className="chips">
@@ -73,7 +73,7 @@ export function Home({ user }) {
       <div className="row" style={{ marginBottom: 8 }}>
         <select style={{ width: "auto", marginBottom: 0 }} value={pays} onChange={(e) => { localStorage.setItem("pays", e.target.value); setPays(e.target.value); setVille(PAYS[e.target.value].v[0]); }}>{Object.keys(PAYS).map((x) => <option key={x}>{x}</option>)}</select>
         <select style={{ width: "auto", marginBottom: 0 }} value={ville} onChange={(e) => setVille(e.target.value)}>{PAYS[pays].v.map((v) => <option key={v}>{v}</option>)}</select>
-        <button className="chip" onClick={() => navigator.geolocation.getCurrentPosition((x) => setPos({ lat: x.coords.latitude, lng: x.coords.longitude }), () => alert("Active le GPS pour trier par distance."))}><Ic n="pin" /> Plus proches</button>
+        <button className="chip" onClick={() => gps((x) => setPos({ lat: x.coords.latitude, lng: x.coords.longitude }))}><Ic n="pin" /> Plus proches</button>
         {cat === "Hôtel" && EQUIP.map((e) => <button key={e} className={"chip" + (equip.includes(e) ? " on" : "")} onClick={() => setEquip(equip.includes(e) ? equip.filter((x) => x !== e) : [...equip, e])}>{e}</button>)}
       </div>
       {cat === "Hôtel" && <input type="number" placeholder="Prix maximum (F)" value={maxp} onChange={(e) => setMaxp(e.target.value)} />}
@@ -81,7 +81,7 @@ export function Home({ user }) {
       {loading && <div className="muted">Chargement…</div>}
       {err && <div className="err">{err}</div>}
       {!loading && !err && list.length === 0 && <div className="muted">Aucun commerçant ici pour le moment.<br /><Link className="link" to="/devenir-commercant">Inscris ta boutique gratuitement</Link></div>}
-      {list.map((s) => <ShopCard key={s.id} s={s} />)}
+      <div className="grid">{list.map((s) => <ShopCard key={s.id} s={s} />)}</div>
     </div>
   );
 }
@@ -152,9 +152,11 @@ export function ShopPage({ user }) {
           {!mine && <button className={"heart" + (fav ? " on" : "")} onClick={toggleFav} aria-label="Favori"><Ic n="heart" fill={fav} /></button>}
         </div>
         <p>{shop.description}</p>
+        <div className="chips">{(CHAMPS[shop.categorie] || []).filter((c) => shop.extra?.[c.k]).map((c) => <span className="chip" key={c.k}>{c.label} : {shop.extra[c.k]}</span>)}</div>
         {shop.horaires && <div className="meta">Horaires : {shop.horaires}</div>}
         {mine && <button className={"chip" + (shop.dispo ? " on" : "")} style={{ marginTop: 10 }} onClick={async () => { await updateDoc(doc(db, "shops", id), { dispo: !shop.dispo }); load(); }}>Disponible maintenant : {shop.dispo ? "OUI" : "NON"}</button>}
       </div>
+      {mine && !shop.premium && <PremiumCard shop={shop} />}
       {mine && <StoryAdd shop={shop} />}
       <h2>Produits et services</h2>
       {products.length === 0 && <div className="card center"><img className="art pipe" src={ART.pipe} alt="" /><b>Aucun produit pour le moment</b><div className="meta">Ce commerçant n'a pas encore ajouté de produits ou services. Revenez bientôt !</div></div>}
@@ -264,6 +266,7 @@ export function Profile({ user }) {
       <div className="dash">
         <div className="row"><span className="ico" style={{ background: "linear-gradient(135deg,#EF4444,#FF6B35)" }}><Ic n="store" /></span><div><b style={{ fontSize: 19 }}>Mes boutiques</b>{mes.length === 0 && <div className="meta">Pas encore de boutique</div>}</div></div>
         {mes.map((s) => <div key={s.id} style={{ margin: "8px 0" }}><Link className="link" to={"/boutique/" + s.id}>{s.nom}</Link> <span className="meta">{s.statut === "valide" ? <><Ic n="check" /> Visible</> : <><Ic n="clock" /> En attente (24 h)</>}</span></div>)}
+        {mes.filter((s) => s.statut === "valide" && !s.premium).slice(0, 1).map((s) => <PremiumCard key={s.id} shop={s} />)}
         <Link className="btn big" to="/devenir-commercant" style={{ marginTop: 10 }}>+ En créer une</Link>
       </div>
       {user.email === ADMIN_EMAIL && <><div className="sub" style={{ margin: "6px 4px" }}>Administration</div>{row("/admin", "shield", "linear-gradient(135deg,#7C3AED,#A78BFA)", "Panneau admin")}</>}
@@ -274,7 +277,7 @@ export function Profile({ user }) {
 
 export function NewShop({ user }) {
   const nav = useNavigate();
-  const [f, setF] = useState({ nom: "", categorie: CATEGORIES[0], whatsapp: "", quartier: "", ville: localStorage.getItem("ville") || "Lomé", description: "", horaires: "", photo: "", equip: [], prix_min: "", lat: null, lng: null, ok: false });
+  const [f, setF] = useState({ nom: "", categorie: CATEGORIES[0], whatsapp: "", quartier: "", ville: localStorage.getItem("ville") || "Lomé", description: "", horaires: "", photo: "", equip: [], prix_min: "", lat: null, lng: null, extra: {}, ok: false });
   const [err, setErr] = useState("");
   if (!user) return <div className="wrap"><div className="card muted">Connecte-toi pour inscrire ta boutique (gratuit).<br /><br /><Link className="btn" to="/connexion">Se connecter</Link></div></div>;
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -283,6 +286,7 @@ export function NewShop({ user }) {
     if (!f.ok) return setErr("Coche la case pour afficher ton numéro.");
     try {
       const { ok, ...data } = f;
+      data.extra = Object.fromEntries((CHAMPS[f.categorie] || []).map((c) => [c.k, f.extra[c.k] || ""]));
       await addDoc(collection(db, "shops"), { ...data, ownerId: user.uid, pays: "Togo", statut: "en_attente", premium: false, date_creation: serverTimestamp() });
       alert("Félicitations ! Ta boutique est en attente de validation. Tu seras visible dans 24 h.");
       nav("/profil");
@@ -299,8 +303,11 @@ export function NewShop({ user }) {
       <input required placeholder="Quartier" value={f.quartier} onChange={set("quartier")} />
       <textarea rows={3} placeholder="Description" value={f.description} onChange={set("description")} />
       <input placeholder="Horaires (ex : 8h - 18h)" value={f.horaires} onChange={set("horaires")} />
-      <button type="button" className="btn line" style={{ marginBottom: 10 }} onClick={() => navigator.geolocation.getCurrentPosition((p) => setF({ ...f, lat: p.coords.latitude, lng: p.coords.longitude }), () => alert("Active le GPS."))}>{f.lat ? <><Ic n="check" /> Position enregistrée</> : <><Ic n="pin" /> Enregistrer la position de ma boutique</>}</button>
+      <button type="button" className="btn line" style={{ marginBottom: 10 }} onClick={() => gps((p) => setF({ ...f, lat: p.coords.latitude, lng: p.coords.longitude }))}>{f.lat ? <><Ic n="check" /> Position enregistrée</> : <><Ic n="pin" /> Enregistrer la position de ma boutique</>}</button>
       {f.categorie === "Hôtel" && <div className="card"><b>Hôtel</b><input type="number" placeholder="Prix de la chambre la moins chère (F)" value={f.prix_min} onChange={set("prix_min")} /><div className="chips">{EQUIP.map((e) => <button type="button" key={e} className={"chip" + (f.equip.includes(e) ? " on" : "")} onClick={() => setF({ ...f, equip: f.equip.includes(e) ? f.equip.filter((x) => x !== e) : [...f.equip, e] })}>{e}</button>)}</div></div>}
+      {(CHAMPS[f.categorie] || []).length > 0 && <div className="card"><b>Informations pour {f.categorie}</b>{CHAMPS[f.categorie].map((c) => c.options
+        ? <select key={c.k} value={f.extra[c.k] || ""} onChange={(e) => setF({ ...f, extra: { ...f.extra, [c.k]: e.target.value } })}><option value="">{c.label}…</option>{c.options.map((o) => <option key={o}>{o}</option>)}</select>
+        : <input key={c.k} type={c.t || "text"} required={c.req} placeholder={c.label + (c.req ? " *" : "")} value={f.extra[c.k] || ""} onChange={(e) => setF({ ...f, extra: { ...f.extra, [c.k]: e.target.value } })} />)}</div>}
       <label className="meta">Photo de la boutique (facultatif)<input type="file" accept="image/*" onChange={async (e) => e.target.files[0] && setF({ ...f, photo: await compress(e.target.files[0]) })} /></label>
       {f.photo && <img src={f.photo} alt="" style={{ width: 90, borderRadius: 12, marginBottom: 10 }} />}
       <label className="meta"><input type="checkbox" style={{ width: "auto", marginRight: 8 }} checked={f.ok} onChange={(e) => setF({ ...f, ok: e.target.checked })} />J'accepte que mon numéro soit affiché</label>

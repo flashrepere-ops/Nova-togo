@@ -11,7 +11,7 @@ import { VILLES, fmt } from "./data";
 export const initTheme = () => {
   document.documentElement.style.fontSize = (localStorage.getItem("size") || "16") + "px";
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
-  document.documentElement.dataset.theme = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark";
 };
 export function ThemeBtn() {
   const [t, setT] = useState(document.documentElement.dataset.theme);
@@ -37,9 +37,7 @@ export function Urgence({ user }) {
   const [d, setD] = useState(DEF);
   const admin = user?.email === ADMIN_EMAIL;
   useEffect(() => { getDoc(doc(db, "emergencies", ville)).then((s) => setD({ ...DEF, ...(s.exists() ? s.data() : {}) })).catch(() => setD(DEF)); }, [ville]);
-  const pos = () => navigator.geolocation.getCurrentPosition(
-    (p) => window.open(wa("", "Au secours ! Ma position : https://maps.google.com/?q=" + p.coords.latitude + "," + p.coords.longitude)),
-    () => alert("Active le GPS pour partager ta position."));
+  const pos = () => gps((p) => window.open(wa("", "Au secours ! Ma position : https://maps.google.com/?q=" + p.coords.latitude + "," + p.coords.longitude)));
   const L = [["Police", "police"], ["Pompiers", "pompiers"], ["Hôpital", "hopital"], ["Pharmacie de garde", "pharmacie_garde"]];
   return (
     <div className="wrap">
@@ -242,6 +240,35 @@ export function Settings({ user }) {
       <div className="card row"><b>Mode clair / sombre</b> <ThemeBtn /></div>
       {user && <div className="card"><b>Supprimer mon compte</b><div className="meta">Action définitive.</div>
         <button className="btn red sm" style={{ marginTop: 8 }} onClick={async () => { if (!confirm("Supprimer définitivement ton compte ?")) return; try { await deleteUser(auth.currentUser); } catch { alert("Déconnecte-toi, reconnecte-toi, puis réessaie."); } }}>Supprimer</button></div>}
+    </div>
+  );
+}
+
+export const gps = (ok) => {
+  if (!navigator.geolocation) return alert("Ce navigateur ne gère pas la localisation.");
+  navigator.geolocation.getCurrentPosition(ok, (e) => alert(e.code === 1
+    ? "La localisation est bloquée pour ce site. Touche le cadenas à côté de l'adresse > Autorisations > Position > Autoriser, puis recharge la page. Vérifie aussi que le GPS du téléphone est activé."
+    : "Position introuvable. Active le GPS du téléphone (précision élevée), sors à l'air libre et réessaie."), { enableHighAccuracy: false, timeout: 15000, maximumAge: 120000 });
+};
+
+export const useSettings = () => {
+  const [s, setS] = useState({ premium: 1000, whatsapp: "", email: ADMIN_EMAIL, flooz: "" });
+  useEffect(() => { getDoc(doc(db, "settings", "app")).then((d) => d.exists() && setS((o) => ({ ...o, ...d.data() }))).catch(() => {}); }, []);
+  return s;
+};
+
+export function PremiumCard({ shop }) {
+  const cfg = useSettings();
+  const msg = "Bonjour, je veux passer Premium (" + fmt(cfg.premium) + " / mois) pour ma boutique « " + shop.nom + " » à " + shop.ville + ". Comment puis-je payer ?";
+  return (
+    <div className="card gold-card">
+      <b style={{ fontSize: 18 }}><Ic n="crown" /> Passe en Premium : {fmt(cfg.premium)} / mois</b>
+      <ul className="adv"><li>Ta boutique en haut de la liste</li><li>Badge doré PREMIUM visible partout</li><li>10 produits au lieu de 3</li><li>Mise en avant dans les recherches</li></ul>
+      <div className="row">
+        <a className="btn gold" target="_blank" rel="noreferrer" href={cfg.whatsapp ? wa(cfg.whatsapp, msg) : "#"} onClick={(e) => { if (!cfg.whatsapp) { e.preventDefault(); alert("Le numéro WhatsApp n'est pas encore configuré. Utilise l'email."); } }}><Ic n="whatsapp" /> Payer le Premium</a>
+        <a className="btn line" href={"mailto:" + cfg.email + "?subject=" + encodeURIComponent("Premium NOVA-TOGO") + "&body=" + encodeURIComponent(msg)}>Écrire par email</a>
+      </div>
+      {cfg.flooz && <div className="meta" style={{ marginTop: 8 }}>Paiement Flooz / Yas : {cfg.flooz}</div>}
     </div>
   );
 }
