@@ -5,6 +5,7 @@ import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, updateDoc,
 import { auth, db, google } from "./firebase";
 import { ADMIN_EMAIL } from "./firebaseConfig";
 import { VILLES, CATEGORIES, fmt } from "./data";
+import { Avatar, compress } from "./extra.jsx";
 
 const initial = (s) => (s || "?").trim().charAt(0).toUpperCase();
 const waLink = (n) => "https://wa.me/" + String(n || "").replace(/\D/g, "");
@@ -14,7 +15,7 @@ function ShopCard({ s }) {
   return (
     <div className="card">
       <Link to={"/boutique/" + s.id} className="shop">
-        <div className="avatar">{initial(s.nom)}</div>
+        <Avatar s={s} />
         <div>
           <b>{s.nom}</b> {s.premium && <span className="badge">PREMIUM</span>}
           <div className="meta">{s.categorie} • {s.quartier}, {s.ville}</div>
@@ -118,7 +119,7 @@ export function ShopPage({ user }) {
     <div className="wrap">
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <div className="shop"><div className="avatar">{initial(shop.nom)}</div>
+          <div className="shop"><Avatar s={shop} />
             <div><h2 style={{ margin: 0 }}>{shop.nom}</h2>
               <div className="meta">{shop.categorie} • {shop.quartier}, {shop.ville}</div>
               <div>{shop.premium && <span className="badge">PREMIUM</span>} {moy && <span><span className="star">★</span> {moy} ({reviews.length})</span>}</div>
@@ -231,7 +232,7 @@ export function Profile({ user }) {
 
 export function NewShop({ user }) {
   const nav = useNavigate();
-  const [f, setF] = useState({ nom: "", categorie: CATEGORIES[0], whatsapp: "", quartier: "", ville: localStorage.getItem("ville") || "Lomé", description: "", horaires: "", ok: false });
+  const [f, setF] = useState({ nom: "", categorie: CATEGORIES[0], whatsapp: "", quartier: "", ville: localStorage.getItem("ville") || "Lomé", description: "", horaires: "", photo: "", ok: false });
   const [err, setErr] = useState("");
   if (!user) return <div className="wrap"><div className="card muted">Connecte-toi pour inscrire ta boutique (gratuit).<br /><br /><Link className="btn" to="/connexion">Se connecter</Link></div></div>;
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -256,6 +257,8 @@ export function NewShop({ user }) {
       <input required placeholder="Quartier" value={f.quartier} onChange={set("quartier")} />
       <textarea rows={3} placeholder="Description" value={f.description} onChange={set("description")} />
       <input placeholder="Horaires (ex : 8h - 18h)" value={f.horaires} onChange={set("horaires")} />
+      <label className="meta">Photo de la boutique (facultatif)<input type="file" accept="image/*" onChange={async (e) => e.target.files[0] && setF({ ...f, photo: await compress(e.target.files[0]) })} /></label>
+      {f.photo && <img src={f.photo} alt="" style={{ width: 90, borderRadius: 12, marginBottom: 10 }} />}
       <label className="meta"><input type="checkbox" style={{ width: "auto", marginRight: 8 }} checked={f.ok} onChange={(e) => setF({ ...f, ok: e.target.checked })} />J'accepte que mon numéro soit affiché</label>
       {err && <div className="err">{err}</div>}
       <button className="btn big" style={{ marginTop: 10 }}>INSCRIRE MA BOUTIQUE</button>

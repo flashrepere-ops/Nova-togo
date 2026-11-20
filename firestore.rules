@@ -4,7 +4,7 @@ service cloud.firestore {
 
     // ⚠️ Remplace par TON email admin (le même que dans src/firebaseConfig.js)
     function isAdmin() {
-      return request.auth != null && request.auth.token.email == "ton-email@gmail.com";
+      return request.auth != null && request.auth.token.email == "pilotepower2@gmail.com";
     }
 
     match /shops/{shopId} {
@@ -34,6 +34,11 @@ service cloud.firestore {
                       && request.resource.data.etoiles >= 1 && request.resource.data.etoiles <= 5;
         allow delete: if isAdmin();
       }
+    }
+
+    match /emergencies/{v} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /users/{uid}/favorites/{fid} {
