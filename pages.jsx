@@ -6,7 +6,7 @@ import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPass
 import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, updateDoc, increment, query, where, serverTimestamp } from "firebase/firestore";
 import { auth, db, google } from "./firebase";
 import { ADMIN_EMAIL } from "./firebaseConfig";
-import { VILLES, CATEGORIES, PAYS, EQUIP, CHAMPS, fmt, t } from "./data";
+import { VILLES, CATEGORIES, DOMAINES, DOM_OF, champsDe, PAYS, EQUIP, fmt, t } from "./data";
 import { Avatar, compress, voice, Price, orderProduct, StoriesBar, StoryAdd, km, PremiumCard, gps } from "./extra.jsx";
 
 const initial = (s) => (s || "?").trim().charAt(0).toUpperCase();
@@ -32,6 +32,7 @@ function ShopCard({ s }) {
 export function Home({ user }) {
   const [ville, setVille] = useState(localStorage.getItem("ville") || "Lomé");
   const [cat, setCat] = useState("");
+  const [dom, setDom] = useState("");
   const [pays, setPays] = useState(localStorage.getItem("pays") || "Togo");
   const [pos, setPos] = useState(null);
   const [equip, setEquip] = useState([]);
@@ -52,8 +53,8 @@ export function Home({ user }) {
 
   const withKm = shops.map((s) => (pos && s.lat != null ? { ...s, km: km(pos, s) } : s));
   const list = (pos ? [...withKm].sort((a, b) => (a.km ?? 9e9) - (b.km ?? 9e9)) : sorted(withKm)).filter((s) =>
-    (!cat || s.categorie === cat) && equip.every((e) => s.equip?.includes(e)) && (!maxp || (Number(s.prix_min) || 0) <= Number(maxp)) &&
-    (!q || (s.nom + " " + s.description + " " + s.categorie).toLowerCase().includes(q.toLowerCase())));
+    (!dom || DOM_OF[s.categorie] === dom) && (!cat || s.categorie === cat) && equip.every((e) => s.equip?.includes(e)) && (!maxp || (Number(s.prix_min) || 0) <= Number(maxp)) &&
+    (!q || (s.nom + " " + s.description + " " + s.categorie + " " + Object.values(s.extra || {}).join(" ")).toLowerCase().includes(q.toLowerCase())));
 
   const prenom = user ? user.displayName || user.email.split("@")[0] : "";
   return (
@@ -66,10 +67,8 @@ export function Home({ user }) {
       <div className="orbs">{[["/taxi", "taxi", "Taxi"], ["/livraison", "box", "Livraison"], ["/urgence", "sos", "Urgence SOS"]].map(([to, k, l]) => <Link key={to} to={to} className="orb-img" aria-label={l}><img src={ORB[k]} alt={l} /></Link>)}</div>
       <StoriesBar />
       <h2>Catégories</h2>
-      <div className="chips">
-        <button className={"chip" + (!cat ? " on" : "")} onClick={() => setCat("")}>Tout</button>
-        {CATEGORIES.map((c) => <button key={c} className={"chip" + (cat === c ? " on" : "")} onClick={() => setCat(c)}>{c}</button>)}
-      </div>
+      <div className="chips"><button className={"chip" + (!dom ? " on" : "")} onClick={() => { setDom(""); setCat(""); }}>Tout</button>{Object.keys(DOMAINES).map((d) => <button key={d} className={"chip" + (dom === d ? " on" : "")} onClick={() => { setDom(d); setCat(""); }}>{d}</button>)}</div>
+      {dom && <div className="chips"><button className={"chip" + (!cat ? " on" : "")} onClick={() => setCat("")}>Tous</button>{DOMAINES[dom].map((c) => <button key={c} className={"chip" + (cat === c ? " on" : "")} onClick={() => setCat(c)}>{c}</button>)}</div>}
       <div className="row" style={{ marginBottom: 8 }}>
         <select style={{ width: "auto", marginBottom: 0 }} value={pays} onChange={(e) => { localStorage.setItem("pays", e.target.value); setPays(e.target.value); setVille(PAYS[e.target.value].v[0]); }}>{Object.keys(PAYS).map((x) => <option key={x}>{x}</option>)}</select>
         <select style={{ width: "auto", marginBottom: 0 }} value={ville} onChange={(e) => setVille(e.target.value)}>{PAYS[pays].v.map((v) => <option key={v}>{v}</option>)}</select>
@@ -93,7 +92,7 @@ export function ShopPage({ user }) {
   const [products, setProducts] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [fav, setFav] = useState(false);
-  const [p, setP] = useState({ nom: "", prix: "", promo: "", fin: "", description: "" });
+  const [p, setP] = useState({ nom: "", prix: "", promo: "", fin: "", description: "", photos: [] });
   const [r, setR] = useState({ etoiles: 5, commentaire: "" });
 
   const load = async () => {
@@ -120,8 +119,8 @@ export function ShopPage({ user }) {
     e.preventDefault();
     const max = shop.premium ? 10 : 3;
     if (products.length >= max) return alert("Limite de " + max + " produits. Passe en Premium pour en ajouter plus.");
-    await addDoc(collection(db, "shops", id, "products"), { nom: p.nom, prix: Number(p.prix), prix_promo: p.promo ? Number(p.promo) : null, fin: p.fin ? new Date(p.fin + "T23:59:59").getTime() : null, description: p.description });
-    setP({ nom: "", prix: "", promo: "", fin: "", description: "" }); load();
+    await addDoc(collection(db, "shops", id, "products"), { nom: p.nom, prix: Number(p.prix), prix_promo: p.promo ? Number(p.promo) : null, fin: p.fin ? new Date(p.fin + "T23:59:59").getTime() : null, description: p.description, photos: p.photos || [] });
+    setP({ nom: "", prix: "", promo: "", fin: "", description: "", photos: [] }); load();
   };
   const addReview = async (e) => {
     e.preventDefault();
@@ -152,7 +151,7 @@ export function ShopPage({ user }) {
           {!mine && <button className={"heart" + (fav ? " on" : "")} onClick={toggleFav} aria-label="Favori"><Ic n="heart" fill={fav} /></button>}
         </div>
         <p>{shop.description}</p>
-        <div className="chips">{(CHAMPS[shop.categorie] || []).filter((c) => shop.extra?.[c.k]).map((c) => <span className="chip" key={c.k}>{c.label} : {shop.extra[c.k]}</span>)}</div>
+        <div className="chips">{(champsDe(shop.categorie) || []).filter((c) => shop.extra?.[c.k]).map((c) => <span className="chip" key={c.k}>{c.label} : {shop.extra[c.k]}</span>)}</div>
         {shop.horaires && <div className="meta">Horaires : {shop.horaires}</div>}
         {mine && <button className={"chip" + (shop.dispo ? " on" : "")} style={{ marginTop: 10 }} onClick={async () => { await updateDoc(doc(db, "shops", id), { dispo: !shop.dispo }); load(); }}>Disponible maintenant : {shop.dispo ? "OUI" : "NON"}</button>}
       </div>
@@ -166,6 +165,7 @@ export function ShopPage({ user }) {
             <b>{x.nom}</b><Price x={x} />
           </div>
           <div className="meta">{x.description}</div>
+          {x.photos?.length > 0 && <div className="chips">{x.photos.map((ph, i) => <img key={i} src={ph} alt="" className="thumb" />)}</div>}
           {!mine && <button className="btn sm" style={{ marginTop: 8 }} onClick={() => orderProduct(user, shop, x)}>Commander</button>}
           {mine && <button className="btn red sm" style={{ marginTop: 8 }} onClick={async () => { await deleteDoc(doc(db, "shops", id, "products", x.id)); load(); }}>Supprimer</button>}
         </div>
@@ -177,6 +177,7 @@ export function ShopPage({ user }) {
           <input required type="number" min="0" placeholder="Prix en F" value={p.prix} onChange={(e) => setP({ ...p, prix: e.target.value })} />
           <input type="number" min="0" placeholder="Prix promo en F (facultatif)" value={p.promo} onChange={(e) => setP({ ...p, promo: e.target.value })} />
           <input type="date" value={p.fin} onChange={(e) => setP({ ...p, fin: e.target.value })} />
+          <input type="file" accept="image/*" multiple onChange={async (e) => setP({ ...p, photos: await Promise.all([...e.target.files].slice(0, 3).map(compress)) })} />
           <input placeholder="Description" value={p.description} onChange={(e) => setP({ ...p, description: e.target.value })} />
           <button className="btn">Ajouter</button>
         </form>
@@ -253,7 +254,7 @@ export function Profile({ user }) {
       <div className="row between" style={{ marginBottom: 14 }}><span style={{ width: 90 }} /><b style={{ letterSpacing: ".15em" }}>NOVA-TOGO</b>
         <span className="row" style={{ flexWrap: "nowrap" }}><Link className="rb" style={{ display: "grid", placeItems: "center", textDecoration: "none" }} to="/messages"><Ic n="bell" /></Link><Link className="rb" style={{ display: "grid", placeItems: "center", textDecoration: "none" }} to="/parametres"><Ic n="gear" /></Link></span></div>
       <div className="glass panel" style={{ position: "relative" }}>
-        <div className="row" style={{ flexWrap: "nowrap" }}><div className="avatar" style={{ width: 84, height: 84, fontSize: 38 }}>{nom[0].toUpperCase()}</div><div><b style={{ fontSize: 22 }}>{nom}</b><div className="meta">{user.email}</div></div></div>
+        <div className="row" style={{ flexWrap: "nowrap" }}>{user.photoURL ? <img className="avatar" style={{ width: 84, height: 84 }} src={user.photoURL} alt="" /> : <div className="avatar" style={{ width: 84, height: 84, fontSize: 38 }}>{nom[0].toUpperCase()}</div>}<div><b style={{ fontSize: 22 }}>{nom}</b><div className="meta">{user.email}</div></div></div>
         <span className="badge" style={{ position: "absolute", top: 14, right: 14 }}><Ic n="sparkle" /> {cmd.pts} POINTS NOVA</span>
         <div className="glass stats"><div>Commandes<b><Ic n="box" /> {cmd.n}</b></div><div>Points<b><Ic n="star" /> {cmd.pts}</b></div><div>Boutiques<b><Ic n="store" /> {mes.length}</b></div></div>
       </div>
@@ -286,7 +287,7 @@ export function NewShop({ user }) {
     if (!f.ok) return setErr("Coche la case pour afficher ton numéro.");
     try {
       const { ok, ...data } = f;
-      data.extra = Object.fromEntries((CHAMPS[f.categorie] || []).map((c) => [c.k, f.extra[c.k] || ""]));
+      data.extra = Object.fromEntries((champsDe(f.categorie) || []).map((c) => [c.k, f.extra[c.k] || ""]));
       await addDoc(collection(db, "shops"), { ...data, ownerId: user.uid, pays: "Togo", statut: "en_attente", premium: false, date_creation: serverTimestamp() });
       alert("Félicitations ! Ta boutique est en attente de validation. Tu seras visible dans 24 h.");
       nav("/profil");
@@ -297,7 +298,7 @@ export function NewShop({ user }) {
       <h2>Inscrire ma boutique</h2>
       <div className="meta" style={{ marginBottom: 10 }}>Inscription gratuite, 1 minute.</div>
       <input required placeholder="Nom de la boutique" value={f.nom} onChange={set("nom")} />
-      <select value={f.categorie} onChange={set("categorie")}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select>
+      <select value={f.categorie} onChange={set("categorie")}>{Object.entries(DOMAINES).map(([d, l]) => <optgroup key={d} label={d}>{l.map((c) => <option key={c}>{c}</option>)}</optgroup>)}</select>
       <input required placeholder="WhatsApp (ex : +22890000000)" value={f.whatsapp} onChange={set("whatsapp")} />
       <select value={f.ville} onChange={set("ville")}>{VILLES.map((v) => <option key={v}>{v}</option>)}</select>
       <input required placeholder="Quartier" value={f.quartier} onChange={set("quartier")} />
@@ -305,7 +306,7 @@ export function NewShop({ user }) {
       <input placeholder="Horaires (ex : 8h - 18h)" value={f.horaires} onChange={set("horaires")} />
       <button type="button" className="btn line" style={{ marginBottom: 10 }} onClick={() => gps((p) => setF({ ...f, lat: p.coords.latitude, lng: p.coords.longitude }))}>{f.lat ? <><Ic n="check" /> Position enregistrée</> : <><Ic n="pin" /> Enregistrer la position de ma boutique</>}</button>
       {f.categorie === "Hôtel" && <div className="card"><b>Hôtel</b><input type="number" placeholder="Prix de la chambre la moins chère (F)" value={f.prix_min} onChange={set("prix_min")} /><div className="chips">{EQUIP.map((e) => <button type="button" key={e} className={"chip" + (f.equip.includes(e) ? " on" : "")} onClick={() => setF({ ...f, equip: f.equip.includes(e) ? f.equip.filter((x) => x !== e) : [...f.equip, e] })}>{e}</button>)}</div></div>}
-      {(CHAMPS[f.categorie] || []).length > 0 && <div className="card"><b>Informations pour {f.categorie}</b>{CHAMPS[f.categorie].map((c) => c.options
+      {(champsDe(f.categorie) || []).length > 0 && <div className="card"><b>Informations pour {f.categorie}</b>{champsDe(f.categorie).map((c) => c.options
         ? <select key={c.k} value={f.extra[c.k] || ""} onChange={(e) => setF({ ...f, extra: { ...f.extra, [c.k]: e.target.value } })}><option value="">{c.label}…</option>{c.options.map((o) => <option key={o}>{o}</option>)}</select>
         : <input key={c.k} type={c.t || "text"} required={c.req} placeholder={c.label + (c.req ? " *" : "")} value={f.extra[c.k] || ""} onChange={(e) => setF({ ...f, extra: { ...f.extra, [c.k]: e.target.value } })} />)}</div>}
       <label className="meta">Photo de la boutique (facultatif)<input type="file" accept="image/*" onChange={async (e) => e.target.files[0] && setF({ ...f, photo: await compress(e.target.files[0]) })} /></label>

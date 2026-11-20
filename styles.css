@@ -149,3 +149,6 @@ nav.bar a{position:relative;z-index:1}
  .orbs{max-width:620px}.cover{margin:-28px -32px 14px}
  .tiles.t4{grid-template-columns:repeat(4,1fr)}
 }
+
+.thumb{height:110px;border-radius:18px;border:1px solid var(--edge);flex:none}
+optgroup{color:#111}

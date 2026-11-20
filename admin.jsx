@@ -17,20 +17,31 @@ export function Admin({ user }) {
   const [users, setUsers] = useState([]);
   const [tab, setTab] = useState("home");
   const [q, setQ] = useState("");
+  const [err, setErr] = useState("");
+  const [res, setRes] = useState([]);
   const ok = user?.email === ADMIN_EMAIL;
   const load = () => {
     getDocs(collection(db, "shops")).then((s) => setShops(s.docs.map((d) => ({ id: d.id, ...d.data() })))).catch(() => {});
-    getDocs(collection(db, "users")).then((s) => setUsers(s.docs.map((d) => ({ id: d.id, ...d.data() })))).catch(() => {});
+    getDocs(collection(db, "users")).then((s) => { setUsers(s.docs.map((d) => ({ id: d.id, ...d.data() }))); setErr(""); }).catch((e) => setErr(e.code || "erreur"));
   };
   useEffect(() => { if (ok) load(); }, [user?.uid]);
   useEffect(() => setCfg(cfg0), [JSON.stringify(cfg0)]);
   if (!ok) return <div className="wrap"><div className="card muted">Accès réservé à l'administrateur.</div></div>;
   const act = async (id, data) => { await updateDoc(doc(db, "shops", id), data); load(); };
+  const diag = async () => {
+    const out = []; const t = async (n, fn) => { try { await fn(); out.push("OK : " + n); } catch (e) { out.push("ERREUR : " + n + " (" + (e.code || e.message) + ")"); } };
+    await t("enregistrer mon compte", () => setDoc(doc(db, "users", user.uid), { email: user.email, nom: user.displayName || "", dernier: new Date().toISOString() }, { merge: true }));
+    await t("lire la liste des comptes", () => getDocs(collection(db, "users")));
+    await t("lire les réglages", () => getDocs(collection(db, "settings")));
+    await t("enregistrer les réglages", () => setDoc(doc(db, "settings", "test"), { ok: true }));
+    setRes(out); load();
+  };
   const price = Number(cfg0.premium) || 1000;
   const wait = shops.filter((s) => s.statut === "en_attente");
   const prem = shops.filter((s) => s.premium).length;
   const owners = new Set(shops.map((s) => s.ownerId));
-  const withShop = users.filter((u) => owners.has(u.id)).length;
+  const total = Math.max(users.length, owners.size);
+  const withShop = owners.size;
   const list = shops.filter((s) => !q || (s.nom + s.categorie + s.ville + s.whatsapp).toLowerCase().includes(q.toLowerCase()));
   const tabs = [["home", "Tableau de bord"], ["shops", "Boutiques"], ["users", "Utilisateurs"], ["cfg", "Réglages"]];
   const Row = ({ s }) => (
@@ -53,11 +64,12 @@ export function Admin({ user }) {
   return (
     <div className="wrap">
       <div className="center"><div className="sub">Admin · NOVA-TOGO</div><h1 className="hello">Tableau de bord</h1></div>
+      {err && <div className="card err">Impossible de lire la liste des comptes ({err}). Cause probable : les règles Firestore ne sont pas à jour. Ouvre Réglages puis « Tester la base de données ».</div>}
       <div className="chips">{tabs.map(([k, l]) => <button key={k} className={"chip" + (tab === k ? " on" : "")} onClick={() => setTab(k)}>{l}</button>)}</div>
 
       {tab === "home" && <>
         <div className="tiles t4">
-          {[["store", shops.length, "Boutiques", "shops"], ["clock", wait.length, "En attente", "shops"], ["crown", prem, "Premium", "shops"], ["user", users.length, "Comptes créés", "users"]].map(([ic, n, lb, to]) => (
+          {[["store", shops.length, "Boutiques", "shops"], ["clock", wait.length, "En attente", "shops"], ["crown", prem, "Premium", "shops"], ["user", total, "Comptes créés", "users"]].map(([ic, n, lb, to]) => (
             <button key={lb} className="glass tile" onClick={() => setTab(to)}><div style={{ fontSize: 28 }}><Ic n={ic} /></div><b>{n}</b>{lb}</button>))}
         </div>
         <div className="banner"><div className="crown"><Ic n="crown" /></div><div><span className="chip on">Revenu Premium estimé</span><div className="big">{fmt(prem * price)} / mois</div><div className="meta">{prem} boutique(s) × {fmt(price)}</div></div></div>
@@ -72,7 +84,7 @@ export function Admin({ user }) {
       </>}
 
       {tab === "users" && <>
-        <div className="tiles"><div className="glass tile"><b>{users.length}</b>Comptes créés</div><div className="glass tile"><b>{withShop}</b>Avec boutique</div><div className="glass tile"><b>{Math.max(users.length - withShop, 0)}</b>Comptes simples</div></div>
+        <div className="tiles"><div className="glass tile"><b>{total}</b>Comptes créés</div><div className="glass tile"><b>{withShop}</b>Avec boutique</div><div className="glass tile"><b>{Math.max(total - withShop, 0)}</b>Comptes simples</div></div>
         <div className="meta" style={{ marginBottom: 10 }}>Les comptes sont comptés dès leur première connexion après cette mise à jour. Le total complet est aussi visible dans Firebase > Authentication.</div>
         {[...users].sort((a, b) => String(b.creation).localeCompare(String(a.creation))).map((u) => (
           <div className="card row between" key={u.id}><div><b>{u.nom || (u.email || "").split("@")[0] || "Sans nom"}</b><div className="meta">{u.email}</div></div>
@@ -86,6 +98,8 @@ export function Admin({ user }) {
         <div className="meta">Email de contact</div><input value={cfg.email} onChange={(e) => setCfg({ ...cfg, email: e.target.value })} />
         <div className="meta">Numéro Flooz / Yas pour recevoir les paiements</div><input value={cfg.flooz} onChange={(e) => setCfg({ ...cfg, flooz: e.target.value })} />
         <button className="btn big" onClick={async () => { await setDoc(doc(db, "settings", "app"), { premium: Number(cfg.premium) || 1000, whatsapp: cfg.whatsapp, email: cfg.email, flooz: cfg.flooz }); alert("Réglages enregistrés."); }}>Enregistrer</button>
+        <button className="btn line big" style={{ marginTop: 10 }} onClick={diag}>Tester la base de données</button>
+        {res.map((r) => <div key={r} className={r.startsWith("OK") ? "ok" : "err"} style={{ marginTop: 6 }}>{r}</div>)}
       </div>}
     </div>
   );

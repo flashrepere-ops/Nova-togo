@@ -4,7 +4,7 @@ import { ART } from "./assets.js";
 import { Link, useParams } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, serverTimestamp, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { auth, db } from "./firebase";
-import { deleteUser } from "firebase/auth";
+import { deleteUser, updateProfile, sendPasswordResetEmail } from "firebase/auth";
 import { ADMIN_EMAIL } from "./firebaseConfig";
 import { VILLES, fmt } from "./data";
 
@@ -168,7 +168,7 @@ export function Orders({ user }) {
 
 export function Chat({ user }) {
   const { shopId, clientId } = useParams();
-  const [msgs, setMsgs] = useState([]); const [t, setT] = useState(""); const [nom, setNom] = useState("");
+  const [msgs, setMsgs] = useState([]); const [t, setT] = useState(""); const [nom, setNom] = useState(""); const [err, setErr] = useState("");
   const cid = shopId + "_" + clientId;
   useEffect(() => {
     if (!user) return; let un;
@@ -180,11 +180,16 @@ export function Chat({ user }) {
     return () => un && un();
   }, [user?.uid, cid]);
   if (!user) return <div className="wrap"><div className="card muted">Connecte-toi pour écrire.</div></div>;
-  const send = async (e) => { e.preventDefault(); if (!t.trim()) return; await addDoc(collection(db, "chats", cid, "msgs"), { from: user.uid, text: t, date: serverTimestamp() }); setT(""); };
+  const send = async (e) => {
+    e.preventDefault(); const txt = t.trim(); if (!txt) return; setErr(""); setT("");
+    try { await addDoc(collection(db, "chats", cid, "msgs"), { from: user.uid, text: txt, date: serverTimestamp() }); }
+    catch (x) { setT(txt); setErr(x.code === "permission-denied" ? "Message refusé : publie les dernières règles Firestore (fichier firestore.rules) dans la console Firebase." : "Message non envoyé (" + (x.code || "erreur") + "). Réessaie."); }
+  };
   return (
     <div className="wrap"><h2><Ic n="chat" /> {nom}</h2>
       {msgs.map((m) => <div key={m.id} style={{ display: "flex", justifyContent: m.from === user.uid ? "flex-end" : "flex-start" }}><div className="card" style={{ maxWidth: "80%", marginBottom: 8, background: m.from === user.uid ? "var(--violet)" : "var(--card)", color: m.from === user.uid ? "#fff" : "var(--ink)" }}>{m.text}</div></div>)}
       <form className="row" onSubmit={send}><input style={{ flex: 1, marginBottom: 0 }} placeholder="Ton message" value={t} onChange={(e) => setT(e.target.value)} /><button className="btn">Envoyer</button></form>
+      {err && <div className="err" style={{ marginTop: 8 }}>{err}</div>}
     </div>
   );
 }
@@ -232,6 +237,8 @@ export function Settings({ user }) {
   const [size, setSize] = useState(localStorage.getItem("size") || "16");
   return (
     <div className="wrap"><h2>Paramètres</h2>
+      {user && <MonProfil user={user} />}
+      {user && <MesArticles user={user} />}
       <div className="card"><b>Langue</b>
         <select value={lang} onChange={(e) => { setLang(e.target.value); localStorage.setItem("lang", e.target.value); location.reload(); }}><option value="fr">Français</option><option value="en">English</option></select>
         <div className="meta">Ewe, Kabyè, Fon, Twi, Mooré : bientôt.</div></div>
@@ -269,6 +276,55 @@ export function PremiumCard({ shop }) {
         <a className="btn line" href={"mailto:" + cfg.email + "?subject=" + encodeURIComponent("Premium NOVA-TOGO") + "&body=" + encodeURIComponent(msg)}>Écrire par email</a>
       </div>
       {cfg.flooz && <div className="meta" style={{ marginTop: 8 }}>Paiement Flooz / Yas : {cfg.flooz}</div>}
+    </div>
+  );
+}
+
+export function MonProfil({ user }) {
+  const [f, setF] = useState({ nom: user.displayName || "", tel: "", ville: "", photo: user.photoURL || "" });
+  useEffect(() => { getDoc(doc(db, "users", user.uid)).then((d) => d.exists() && setF((o) => ({ ...o, tel: d.data().tel || "", ville: d.data().ville || "", photo: d.data().photo || o.photo }))).catch(() => {}); }, [user.uid]);
+  const save = async () => {
+    try {
+      await setDoc(doc(db, "users", user.uid), { nom: f.nom, tel: f.tel, ville: f.ville, photo: f.photo }, { merge: true });
+      await updateProfile(auth.currentUser, { displayName: f.nom });
+      window.dispatchEvent(new Event("prof")); alert("Profil enregistré.");
+    } catch (e) { alert("Impossible d'enregistrer (" + (e.code || "erreur") + "). Vérifie que les règles Firestore sont à jour."); }
+  };
+  return (
+    <div className="card"><b>Mon profil</b>
+      <div className="row" style={{ margin: "10px 0" }}>{f.photo ? <img className="avatar" src={f.photo} alt="" /> : <div className="avatar">{(f.nom || "?")[0].toUpperCase()}</div>}
+        <input type="file" accept="image/*" style={{ flex: 1, marginBottom: 0 }} onChange={async (e) => e.target.files[0] && setF({ ...f, photo: await compress(e.target.files[0]) })} /></div>
+      <input placeholder="Nom complet" value={f.nom} onChange={(e) => setF({ ...f, nom: e.target.value })} />
+      <input placeholder="Téléphone / WhatsApp" value={f.tel} onChange={(e) => setF({ ...f, tel: e.target.value })} />
+      <select value={f.ville} onChange={(e) => setF({ ...f, ville: e.target.value })}><option value="">Ma ville…</option>{VILLES.map((v) => <option key={v}>{v}</option>)}</select>
+      <div className="row"><button className="btn" onClick={save}>Enregistrer mon profil</button>
+        {user.email && <button className="btn line" onClick={async () => { await sendPasswordResetEmail(auth, user.email); alert("Email envoyé pour changer ton mot de passe."); }}>Changer mon mot de passe</button>}</div>
+    </div>
+  );
+}
+
+export function MesArticles({ user }) {
+  const [shops, setShops] = useState([]); const [prods, setProds] = useState({});
+  const load = async () => {
+    const l = (await getDocs(query(collection(db, "shops"), where("ownerId", "==", user.uid)))).docs.map((d) => ({ id: d.id, ...d.data() })); setShops(l);
+    const o = {}; for (const sh of l) o[sh.id] = (await getDocs(collection(db, "shops", sh.id, "products"))).docs.map((d) => ({ id: d.id, ...d.data() })); setProds(o);
+  };
+  useEffect(() => { load().catch(() => {}); }, [user.uid]);
+  if (!shops.length) return null;
+  const pd = (sid, pid) => doc(db, "shops", sid, "products", pid);
+  return (
+    <div className="card"><b>Mes articles et photos</b>
+      {shops.map((sh) => (
+        <div key={sh.id} style={{ marginTop: 12 }}><b>{sh.nom}</b>
+          <div className="meta">Photo de la boutique</div>
+          <input type="file" accept="image/*" onChange={async (e) => { if (e.target.files[0]) { await updateDoc(doc(db, "shops", sh.id), { photo: await compress(e.target.files[0]) }); load(); } }} />
+          {(prods[sh.id] || []).length === 0 && <div className="meta">Aucun article. Ajoute-en depuis la fiche de la boutique.</div>}
+          {(prods[sh.id] || []).map((p) => (
+            <div key={p.id} className="glass" style={{ padding: 12, margin: "8px 0" }}><b>{p.nom}</b> <span className="prix">{fmt(p.prix)}</span>
+              <div className="chips">{(p.photos || []).map((ph, i) => <span key={i} style={{ position: "relative" }}><img src={ph} alt="" className="thumb" /><button className="btn red sm" style={{ position: "absolute", top: 4, right: 4, padding: "2px 8px" }} onClick={async () => { await updateDoc(pd(sh.id, p.id), { photos: p.photos.filter((_, k) => k !== i) }); load(); }}>×</button></span>)}</div>
+              {(p.photos || []).length < 5 && <input type="file" accept="image/*" onChange={async (e) => { if (e.target.files[0]) { await updateDoc(pd(sh.id, p.id), { photos: [...(p.photos || []), await compress(e.target.files[0])] }); load(); } }} />}
+            </div>))}
+        </div>))}
     </div>
   );
 }
