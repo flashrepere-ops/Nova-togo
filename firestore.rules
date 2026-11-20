@@ -59,6 +59,11 @@ service cloud.firestore {
       allow delete: if (request.auth != null && resource.data.ownerId == request.auth.uid) || isAdmin();
     }
 
+    match /referrals/{uid} {
+      allow create: if request.auth != null && request.auth.uid == uid && request.resource.data.parrainId != uid;
+      allow read: if request.auth != null && (request.auth.uid == uid || resource.data.parrainId == request.auth.uid);
+    }
+
     match /emergencies/{v} {
       allow read: if true;
       allow write: if isAdmin();

@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, serverTimestamp, onSnapshot, orderBy, query, where } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
+import { deleteUser } from "firebase/auth";
 import { ADMIN_EMAIL } from "./firebaseConfig";
 import { VILLES, fmt } from "./data";
 
 export const initTheme = () => {
+  document.documentElement.style.fontSize = (localStorage.getItem("size") || "16") + "px";
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
   document.documentElement.dataset.theme = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 };
@@ -124,20 +126,22 @@ export async function orderProduct(user, shop, x) {
 export function Orders({ user }) {
   const [mine, setMine] = useState([]);
   const [recv, setRecv] = useState([]);
+  const [refs, setRefs] = useState(0);
   const load = () => {
     if (!user) return;
     const g = (f) => getDocs(query(collection(db, "orders"), where(f, "==", user.uid)))
       .then((s) => s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0)));
     g("clientId").then(setMine).catch(() => {}); g("shopOwnerId").then(setRecv).catch(() => {});
+    getDocs(query(collection(db, "referrals"), where("parrainId", "==", user.uid))).then((s) => setRefs(s.size)).catch(() => {});
   };
   useEffect(load, [user?.uid]);
   if (!user) return <div className="wrap"><div className="card muted">Connecte-toi pour voir tes commandes.</div></div>;
-  const pts = mine.filter((o) => o.statut === "livree").reduce((a, o) => a + Math.floor(o.total / 100), 0);
+  const pts = mine.filter((o) => o.statut === "livree").reduce((a, o) => a + Math.floor(o.total / 100), 0) + refs * 20;
   const niv = pts >= 500 ? "VIP OR" : pts >= 200 ? "VIP" : pts >= 50 ? "Fidèle" : "Nouveau";
   const set = async (id, statut) => { await updateDoc(doc(db, "orders", id), { statut }); load(); };
   return (
     <div className="wrap">
-      <div className="hero"><h1>{pts} points NOVA</h1>Niveau : <b>{niv}</b><div style={{ fontSize: 13, marginTop: 6 }}>100 F dépensés = 1 point (commande livrée). 100 points = 1 livraison offerte, 200 points = 1 plat offert chez un partenaire.</div></div>
+      <div className="hero"><h1>{pts} points NOVA</h1>Niveau : <b>{niv}</b> • {refs} ami(s) invité(s) (+20 points chacun)<div style={{ fontSize: 13, marginTop: 6 }}>100 F dépensés = 1 point (commande livrée). 100 points = 1 livraison offerte, 200 points = 1 plat offert chez un partenaire.</div></div>
       <h2>Mes commandes</h2>
       {mine.length === 0 && <div className="muted">Aucune commande pour le moment.</div>}
       {mine.map((o) => <div className="card" key={o.id}><b>{o.produit}</b> <span className="prix">{fmt(o.total)}</span><div className="meta">{o.shopNom} • {o.livraison ? "Livraison" : "Retrait"} • {o.statut === "livree" ? "✅ Livrée" : "⏳ Envoyée"}</div></div>)}
@@ -202,6 +206,29 @@ export function StoryAdd({ shop }) {
     <div className="card"><b>Story du jour (24 h)</b>
       <input placeholder="Texte (ex : Foufou -20 % aujourd'hui)" value={t} onChange={(e) => setT(e.target.value)} />
       <input type="file" accept="image/*" onChange={async (e) => { const f = e.target.files[0]; if (!f) return; await addDoc(collection(db, "stories"), { shopId: shop.id, ownerId: shop.ownerId, shopNom: shop.nom, photo: await compress(f), texte: t, expire: Date.now() + 864e5 }); setT(""); alert("Story publiée pour 24 h."); }} />
+    </div>
+  );
+}
+
+export const km = (a, b) => {
+  const r = (x) => (x * Math.PI) / 180, dl = r(b.lng - a.lng), dp = r(b.lat - a.lat);
+  const h = Math.sin(dp / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dl / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+};
+
+export function Settings({ user }) {
+  const [lang, setLang] = useState(localStorage.getItem("lang") || "fr");
+  const [size, setSize] = useState(localStorage.getItem("size") || "16");
+  return (
+    <div className="wrap"><h2>Paramètres</h2>
+      <div className="card"><b>Langue</b>
+        <select value={lang} onChange={(e) => { setLang(e.target.value); localStorage.setItem("lang", e.target.value); location.reload(); }}><option value="fr">Français</option><option value="en">English</option></select>
+        <div className="meta">Ewe, Kabyè, Fon, Twi, Mooré : bientôt.</div></div>
+      <div className="card"><b>Taille du texte</b>
+        <select value={size} onChange={(e) => { setSize(e.target.value); localStorage.setItem("size", e.target.value); document.documentElement.style.fontSize = e.target.value + "px"; }}><option value="14">Petit</option><option value="16">Moyen</option><option value="19">Grand</option><option value="22">Très grand</option></select></div>
+      <div className="card row"><b>Mode clair / sombre</b> <ThemeBtn /></div>
+      {user && <div className="card"><b>Supprimer mon compte</b><div className="meta">Action définitive.</div>
+        <button className="btn red sm" style={{ marginTop: 8 }} onClick={async () => { if (!confirm("Supprimer définitivement ton compte ?")) return; try { await deleteUser(auth.currentUser); } catch { alert("Déconnecte-toi, reconnecte-toi, puis réessaie."); } }}>Supprimer</button></div>}
     </div>
   );
 }

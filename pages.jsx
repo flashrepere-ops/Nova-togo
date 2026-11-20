@@ -4,8 +4,8 @@ import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPass
 import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, updateDoc, query, where, serverTimestamp } from "firebase/firestore";
 import { auth, db, google } from "./firebase";
 import { ADMIN_EMAIL } from "./firebaseConfig";
-import { VILLES, CATEGORIES, fmt } from "./data";
-import { Avatar, compress, voice, Price, orderProduct, StoriesBar, StoryAdd } from "./extra.jsx";
+import { VILLES, CATEGORIES, PAYS, EQUIP, fmt, t } from "./data";
+import { Avatar, compress, voice, Price, orderProduct, StoriesBar, StoryAdd, km } from "./extra.jsx";
 
 const initial = (s) => (s || "?").trim().charAt(0).toUpperCase();
 const waLink = (n) => "https://wa.me/" + String(n || "").replace(/\D/g, "");
@@ -18,7 +18,7 @@ function ShopCard({ s }) {
         <Avatar s={s} />
         <div>
           <b>{s.nom}</b> {s.premium && <span className="badge">PREMIUM</span>}
-          <div className="meta">{s.categorie} • {s.quartier}, {s.ville}</div>
+          <div className="meta">{s.categorie} • {s.quartier}, {s.ville}{s.km != null && " • " + s.km.toFixed(1) + " km"}</div>
           <div className="meta">{s.description?.slice(0, 70)}</div>
         </div>
       </Link>
@@ -33,6 +33,10 @@ function ShopCard({ s }) {
 export function Home() {
   const [ville, setVille] = useState(localStorage.getItem("ville") || "Lomé");
   const [cat, setCat] = useState("");
+  const [pays, setPays] = useState(localStorage.getItem("pays") || "Togo");
+  const [pos, setPos] = useState(null);
+  const [equip, setEquip] = useState([]);
+  const [maxp, setMaxp] = useState("");
   const [q, setQ] = useState("");
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,16 +51,18 @@ export function Home() {
       .finally(() => setLoading(false));
   }, [ville]);
 
-  const list = sorted(shops).filter((s) =>
-    (!cat || s.categorie === cat) &&
+  const withKm = shops.map((s) => (pos && s.lat != null ? { ...s, km: km(pos, s) } : s));
+  const list = (pos ? [...withKm].sort((a, b) => (a.km ?? 9e9) - (b.km ?? 9e9)) : sorted(withKm)).filter((s) =>
+    (!cat || s.categorie === cat) && equip.every((e) => s.equip?.includes(e)) && (!maxp || (Number(s.prix_min) || 0) <= Number(maxp)) &&
     (!q || (s.nom + " " + s.description + " " + s.categorie).toLowerCase().includes(q.toLowerCase())));
 
   return (
     <div className="wrap">
       <StoriesBar />
       <div className="hero">
-        <h1>Trouve tout près de chez toi</h1>
-        <select value={ville} onChange={(e) => setVille(e.target.value)}>{VILLES.map((v) => <option key={v}>{v}</option>)}</select>
+        <h1>{t("Trouve tout près de chez toi")}</h1>
+        <select value={pays} onChange={(e) => { localStorage.setItem("pays", e.target.value); setPays(e.target.value); setVille(PAYS[e.target.value].v[0]); }}>{Object.keys(PAYS).map((p) => <option key={p}>{p}</option>)}</select>
+        <select value={ville} onChange={(e) => setVille(e.target.value)}>{PAYS[pays].v.map((v) => <option key={v}>{v}</option>)}</select>
         <input placeholder={"Cherche un service à " + ville} value={q} onChange={(e) => setQ(e.target.value)} />
         <button type="button" className="btn sm" style={{ marginTop: 8, background: "#2563EB" }} onClick={() => voice(setQ)}>🎤 Parler pour chercher</button>
       </div>
@@ -65,6 +71,11 @@ export function Home() {
         <button className={"chip" + (!cat ? " on" : "")} onClick={() => setCat("")}>Tout</button>
         {CATEGORIES.map((c) => <button key={c} className={"chip" + (cat === c ? " on" : "")} onClick={() => setCat(c)}>{c}</button>)}
       </div>
+      <div className="row" style={{ marginBottom: 8 }}>
+        <button className="chip" onClick={() => navigator.geolocation.getCurrentPosition((p) => setPos({ lat: p.coords.latitude, lng: p.coords.longitude }), () => alert("Active le GPS pour trier par distance."))}>📍 Plus proches</button>
+        {cat === "Hôtel" && EQUIP.map((e) => <button key={e} className={"chip" + (equip.includes(e) ? " on" : "")} onClick={() => setEquip(equip.includes(e) ? equip.filter((x) => x !== e) : [...equip, e])}>{e}</button>)}
+      </div>
+      {cat === "Hôtel" && <input type="number" placeholder="Prix maximum (F)" value={maxp} onChange={(e) => setMaxp(e.target.value)} />}
       {loading && <div className="muted">Chargement…</div>}
       {err && <div className="err">{err}</div>}
       {!loading && !err && list.length === 0 && (
@@ -229,7 +240,8 @@ export function Profile({ user }) {
       <div className="card row"><div className="avatar">{initial(user.displayName || user.email)}</div><div><b>{user.displayName || "Mon compte"}</b><div className="meta">{user.email}</div></div></div>
       <Link className="btn big" to="/commandes" style={{ display: "block", marginBottom: 12 }}>Mes commandes et points NOVA</Link>
       <Link className="btn line" to="/messages" style={{ display: "block", marginBottom: 12, textAlign: "center" }}>💬 Mes messages</Link>
-      <a className="btn wa" style={{ display: "block", marginBottom: 12, textAlign: "center" }} href={"https://wa.me/?text=" + encodeURIComponent("Télécharge NOVA-TOGO, l'app pour trouver tout au Togo : taxi, hôtel, pharmacie, marché, livraison. " + location.href.split("#")[0])} target="_blank" rel="noreferrer">Inviter un ami sur WhatsApp</a>
+      <Link className="btn line" to="/parametres" style={{ display: "block", marginBottom: 12, textAlign: "center" }}>⚙️ Paramètres</Link>
+      <a className="btn wa" style={{ display: "block", marginBottom: 12, textAlign: "center" }} href={"https://wa.me/?text=" + encodeURIComponent("Télécharge NOVA-TOGO, l'app pour trouver tout au Togo : taxi, hôtel, pharmacie, marché, livraison. " + location.href.split("#")[0] + "#/?ref=" + user.uid)} target="_blank" rel="noreferrer">Inviter un ami sur WhatsApp</a>
       <h2>Mes boutiques</h2>
       {mes.length === 0 && <div className="muted">Pas encore de boutique. <Link to="/devenir-commercant">En créer une</Link></div>}
       {mes.map((s) => (
@@ -244,7 +256,7 @@ export function Profile({ user }) {
 
 export function NewShop({ user }) {
   const nav = useNavigate();
-  const [f, setF] = useState({ nom: "", categorie: CATEGORIES[0], whatsapp: "", quartier: "", ville: localStorage.getItem("ville") || "Lomé", description: "", horaires: "", photo: "", ok: false });
+  const [f, setF] = useState({ nom: "", categorie: CATEGORIES[0], whatsapp: "", quartier: "", ville: localStorage.getItem("ville") || "Lomé", description: "", horaires: "", photo: "", equip: [], prix_min: "", lat: null, lng: null, ok: false });
   const [err, setErr] = useState("");
   if (!user) return <div className="wrap"><div className="card muted">Connecte-toi pour inscrire ta boutique (gratuit).<br /><br /><Link className="btn" to="/connexion">Se connecter</Link></div></div>;
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -269,6 +281,8 @@ export function NewShop({ user }) {
       <input required placeholder="Quartier" value={f.quartier} onChange={set("quartier")} />
       <textarea rows={3} placeholder="Description" value={f.description} onChange={set("description")} />
       <input placeholder="Horaires (ex : 8h - 18h)" value={f.horaires} onChange={set("horaires")} />
+      <button type="button" className="btn line" style={{ marginBottom: 10 }} onClick={() => navigator.geolocation.getCurrentPosition((p) => setF({ ...f, lat: p.coords.latitude, lng: p.coords.longitude }), () => alert("Active le GPS."))}>{f.lat ? "✅ Position enregistrée" : "📍 Enregistrer la position de ma boutique"}</button>
+      {f.categorie === "Hôtel" && <div className="card"><b>Hôtel</b><input type="number" placeholder="Prix de la chambre la moins chère (F)" value={f.prix_min} onChange={set("prix_min")} /><div className="chips">{EQUIP.map((e) => <button type="button" key={e} className={"chip" + (f.equip.includes(e) ? " on" : "")} onClick={() => setF({ ...f, equip: f.equip.includes(e) ? f.equip.filter((x) => x !== e) : [...f.equip, e] })}>{e}</button>)}</div></div>}
       <label className="meta">Photo de la boutique (facultatif)<input type="file" accept="image/*" onChange={async (e) => e.target.files[0] && setF({ ...f, photo: await compress(e.target.files[0]) })} /></label>
       {f.photo && <img src={f.photo} alt="" style={{ width: 90, borderRadius: 12, marginBottom: 10 }} />}
       <label className="meta"><input type="checkbox" style={{ width: "auto", marginRight: 8 }} checked={f.ok} onChange={(e) => setF({ ...f, ok: e.target.checked })} />J'accepte que mon numéro soit affiché</label>
@@ -299,7 +313,7 @@ export function Admin({ user }) {
   const wait = shops.filter((s) => s.statut === "en_attente");
   return (
     <div className="wrap">
-      <div className="card"><b>{shops.length}</b> boutiques • <b>{wait.length}</b> en attente • <b>{shops.filter((s) => s.premium).length}</b> premium</div>
+      <div className="card"><b>{shops.length}</b> boutiques • <b>{wait.length}</b> en attente • <b>{shops.filter((s) => s.premium).length}</b> premium • Revenu Premium estimé : <b>{fmt(shops.filter((s) => s.premium).length * 5000)}</b> / mois</div>
       {shops.map((s) => (
         <div className="card" key={s.id}>
           <b>{s.nom}</b> <span className="meta">{s.categorie} • {s.ville} • {s.statut}</span>
