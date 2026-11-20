@@ -5,7 +5,7 @@ import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, updateDoc,
 import { auth, db, google } from "./firebase";
 import { ADMIN_EMAIL } from "./firebaseConfig";
 import { VILLES, CATEGORIES, fmt } from "./data";
-import { Avatar, compress, voice, Price, orderProduct } from "./extra.jsx";
+import { Avatar, compress, voice, Price, orderProduct, StoriesBar, StoryAdd } from "./extra.jsx";
 
 const initial = (s) => (s || "?").trim().charAt(0).toUpperCase();
 const waLink = (n) => "https://wa.me/" + String(n || "").replace(/\D/g, "");
@@ -53,12 +53,14 @@ export function Home() {
 
   return (
     <div className="wrap">
+      <StoriesBar />
       <div className="hero">
         <h1>Trouve tout près de chez toi</h1>
         <select value={ville} onChange={(e) => setVille(e.target.value)}>{VILLES.map((v) => <option key={v}>{v}</option>)}</select>
         <input placeholder={"Cherche un service à " + ville} value={q} onChange={(e) => setQ(e.target.value)} />
         <button type="button" className="btn sm" style={{ marginTop: 8, background: "#2563EB" }} onClick={() => voice(setQ)}>🎤 Parler pour chercher</button>
       </div>
+      <div className="row" style={{ marginBottom: 12 }}><Link className="btn sm sos" to="/taxi">🚕 Taxi</Link><Link className="btn sm" style={{ background: "#2563EB" }} to="/livraison">🛵 Livraison</Link><Link className="btn sm red" to="/urgence">🆘 Urgence</Link></div>
       <div className="chips">
         <button className={"chip" + (!cat ? " on" : "")} onClick={() => setCat("")}>Tout</button>
         {CATEGORIES.map((c) => <button key={c} className={"chip" + (cat === c ? " on" : "")} onClick={() => setCat(c)}>{c}</button>)}
@@ -112,7 +114,8 @@ export function ShopPage({ user }) {
   const addReview = async (e) => {
     e.preventDefault();
     if (!user) return alert("Connecte-toi pour donner ton avis.");
-    await addDoc(collection(db, "shops", id, "reviews"), { userId: user.uid, auteur: user.displayName || "Client", etoiles: Number(r.etoiles), commentaire: r.commentaire, date: serverTimestamp() });
+    const ver = !(await getDocs(query(collection(db, "orders"), where("clientId", "==", user.uid), where("shopId", "==", id), where("statut", "==", "livree")))).empty;
+    await addDoc(collection(db, "shops", id, "reviews"), { userId: user.uid, auteur: user.displayName || "Client", verifie: ver, etoiles: Number(r.etoiles), commentaire: r.commentaire, date: serverTimestamp() });
     setR({ etoiles: 5, commentaire: "" }); load();
   };
 
@@ -132,9 +135,11 @@ export function ShopPage({ user }) {
         <div className="row" style={{ marginTop: 10 }}>
           <a className="btn" href={"tel:" + shop.whatsapp}>Appeler</a>
           <a className="btn wa" href={waLink(shop.whatsapp)} target="_blank" rel="noreferrer">WhatsApp</a>
+          {!mine && user && <Link className="btn line" to={"/chat/" + id + "/" + user.uid}>💬 Écrire</Link>}
         </div>
       </div>
 
+      {mine && <StoryAdd shop={shop} />}
       <h2>Produits et services</h2>
       {products.length === 0 && <div className="muted">Aucun produit pour le moment.</div>}
       {products.map((x) => (
@@ -161,7 +166,7 @@ export function ShopPage({ user }) {
 
       <h2>Avis</h2>
       {reviews.map((x) => (
-        <div className="card" key={x.id}><b>{x.auteur}</b> <span className="star">{"★".repeat(x.etoiles)}</span><div className="meta">{x.commentaire}</div></div>
+        <div className="card" key={x.id}><b>{x.auteur}</b>{x.verifie && <span className="ok"> ✔ Vérifié</span>} <span className="star">{"★".repeat(x.etoiles)}</span><div className="meta">{x.commentaire}</div></div>
       ))}
       <form className="card" onSubmit={addReview}>
         <select value={r.etoiles} onChange={(e) => setR({ ...r, etoiles: e.target.value })}>
@@ -223,6 +228,8 @@ export function Profile({ user }) {
     <div className="wrap">
       <div className="card row"><div className="avatar">{initial(user.displayName || user.email)}</div><div><b>{user.displayName || "Mon compte"}</b><div className="meta">{user.email}</div></div></div>
       <Link className="btn big" to="/commandes" style={{ display: "block", marginBottom: 12 }}>Mes commandes et points NOVA</Link>
+      <Link className="btn line" to="/messages" style={{ display: "block", marginBottom: 12, textAlign: "center" }}>💬 Mes messages</Link>
+      <a className="btn wa" style={{ display: "block", marginBottom: 12, textAlign: "center" }} href={"https://wa.me/?text=" + encodeURIComponent("Télécharge NOVA-TOGO, l'app pour trouver tout au Togo : taxi, hôtel, pharmacie, marché, livraison. " + location.href.split("#")[0])} target="_blank" rel="noreferrer">Inviter un ami sur WhatsApp</a>
       <h2>Mes boutiques</h2>
       {mes.length === 0 && <div className="muted">Pas encore de boutique. <Link to="/devenir-commercant">En créer une</Link></div>}
       {mes.map((s) => (

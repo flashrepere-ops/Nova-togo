@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Routes, Route, Link, NavLink } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./firebase";
-import { Urgence, Taxi, Orders, ThemeBtn, initTheme } from "./extra.jsx";
+import { Urgence, Taxi, Orders, Chat, Inbox, ThemeBtn, initTheme } from "./extra.jsx";
 import { Home, ShopPage, Login, Profile, NewShop, Admin, Favorites } from "./pages.jsx";
 
 initTheme();
@@ -27,6 +27,9 @@ export default function App() {
         <Route path="/favoris" element={<Favorites user={user} />} />
         <Route path="/commandes" element={<Orders user={user} />} />
         <Route path="/taxi" element={<Taxi />} />
+        <Route path="/livraison" element={<Taxi kind="Livreur" />} />
+        <Route path="/chat/:shopId/:clientId" element={<Chat user={user} />} />
+        <Route path="/messages" element={<Inbox user={user} />} />
         <Route path="/urgence" element={<Urgence user={user} />} />
         <Route path="/admin" element={<Admin user={user} />} />
       </Routes>

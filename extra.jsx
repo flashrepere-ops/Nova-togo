@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, serverTimestamp, query, where } from "firebase/firestore";
+import { Link, useParams } from "react-router-dom";
+import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, serverTimestamp, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { db } from "./firebase";
 import { ADMIN_EMAIL } from "./firebaseConfig";
 import { VILLES, fmt } from "./data";
 
 export const initTheme = () => {
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
   document.documentElement.dataset.theme = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 };
 export function ThemeBtn() {
@@ -57,25 +59,25 @@ export function Urgence({ user }) {
   );
 }
 
-export function Taxi() {
+export function Taxi({ kind = "Taxi" }) {
   const [ville, setVille] = useState(localStorage.getItem("ville") || "Lomé");
   const [l, setL] = useState([]);
   const [f, setF] = useState({ depart: "", dest: "", pers: 1 });
   useEffect(() => {
     getDocs(query(collection(db, "shops"), where("statut", "==", "valide"), where("ville", "==", ville)))
-      .then((s) => setL(s.docs.map((d) => ({ id: d.id, ...d.data() })).filter((x) => x.categorie?.startsWith("Taxi")).sort((a, b) => (b.premium ? 1 : 0) - (a.premium ? 1 : 0))))
+      .then((s) => setL(s.docs.map((d) => ({ id: d.id, ...d.data() })).filter((x) => x.categorie?.startsWith(kind)).sort((a, b) => (b.premium ? 1 : 0) - (a.premium ? 1 : 0))))
       .catch(() => setL([]));
   }, [ville]);
-  const msg = "Bonjour, je veux un taxi à " + ville + ". Départ : " + f.depart + ". Destination : " + f.dest + ". Personnes : " + f.pers + ". (NOVA-TOGO)";
+  const msg = "Bonjour, " + (kind === "Taxi" ? "je veux un taxi" : "je veux une livraison") + " à " + ville + ". Départ : " + f.depart + ". Destination : " + f.dest + ". Personnes : " + f.pers + ". (NOVA-TOGO)";
   const ok = f.depart && f.dest;
   return (
     <div className="wrap">
-      <div className="hero sos"><h1>Je veux un taxi</h1>
+      <div className="hero sos"><h1>{kind === "Taxi" ? "Je veux un taxi" : "Je veux être livré"}</h1>
         <select value={ville} onChange={(e) => setVille(e.target.value)}>{VILLES.map((v) => <option key={v}>{v}</option>)}</select>
         <input placeholder="Où es-tu ? (quartier, repère)" value={f.depart} onChange={(e) => setF({ ...f, depart: e.target.value })} />
         <input placeholder="Où vas-tu ?" value={f.dest} onChange={(e) => setF({ ...f, dest: e.target.value })} />
       </div>
-      {l.length === 0 && <div className="muted">Aucun taximan à {ville} pour le moment.<br />Taximan ? Inscris-toi dans « Ma boutique », catégorie Taxi Moto ou Taxi Voiture.</div>}
+      {l.length === 0 && <div className="muted">Aucun {kind === "Taxi" ? "taximan" : "livreur"} à {ville} pour le moment.<br />Inscris-toi dans « Ma boutique », catégorie {kind === "Taxi" ? "Taxi Moto ou Taxi Voiture" : "Livreur"}.</div>}
       {l.map((x) => (
         <div className="card" key={x.id}>
           <div className="shop"><Avatar s={x} /><div><b>{x.nom}</b> {x.premium && <span className="badge">PREMIUM</span>}<div className="meta">{x.categorie} • {x.quartier}</div></div></div>
@@ -145,6 +147,61 @@ export function Orders({ user }) {
           <div className="meta">{o.client} • {o.livraison ? "Livraison : " + o.adresse : "Retrait"} • {o.statut === "livree" ? "✅ Livrée" : "⏳ À livrer"}</div>
           {o.statut !== "livree" && <button className="btn sm" style={{ marginTop: 8 }} onClick={() => set(o.id, "livree")}>Marquer livrée</button>}
         </div>))}
+    </div>
+  );
+}
+
+export function Chat({ user }) {
+  const { shopId, clientId } = useParams();
+  const [msgs, setMsgs] = useState([]); const [t, setT] = useState(""); const [nom, setNom] = useState("");
+  const cid = shopId + "_" + clientId;
+  useEffect(() => {
+    if (!user) return; let un;
+    getDoc(doc(db, "shops", shopId)).then(async (s) => {
+      const sh = s.data(); setNom(sh.nom);
+      await setDoc(doc(db, "chats", cid), { clientId, ownerId: sh.ownerId, shopNom: sh.nom, shopId, ...(user.uid === clientId ? { clientNom: user.displayName || user.email } : {}) }, { merge: true });
+      un = onSnapshot(query(collection(db, "chats", cid, "msgs"), orderBy("date")), (q) => setMsgs(q.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    }).catch(() => {});
+    return () => un && un();
+  }, [user?.uid, cid]);
+  if (!user) return <div className="wrap"><div className="card muted">Connecte-toi pour écrire.</div></div>;
+  const send = async (e) => { e.preventDefault(); if (!t.trim()) return; await addDoc(collection(db, "chats", cid, "msgs"), { from: user.uid, text: t, date: serverTimestamp() }); setT(""); };
+  return (
+    <div className="wrap"><h2>💬 {nom}</h2>
+      {msgs.map((m) => <div key={m.id} style={{ display: "flex", justifyContent: m.from === user.uid ? "flex-end" : "flex-start" }}><div className="card" style={{ maxWidth: "80%", marginBottom: 8, background: m.from === user.uid ? "var(--violet)" : "var(--card)", color: m.from === user.uid ? "#fff" : "var(--ink)" }}>{m.text}</div></div>)}
+      <form className="row" onSubmit={send}><input style={{ flex: 1, marginBottom: 0 }} placeholder="Ton message" value={t} onChange={(e) => setT(e.target.value)} /><button className="btn">Envoyer</button></form>
+    </div>
+  );
+}
+
+export function Inbox({ user }) {
+  const [l, setL] = useState([]);
+  useEffect(() => { if (user) Promise.all(["clientId", "ownerId"].map((f) => getDocs(query(collection(db, "chats"), where(f, "==", user.uid))))).then((r) => setL(r.flatMap((s) => s.docs.map((d) => ({ id: d.id, ...d.data() }))))).catch(() => {}); }, [user?.uid]);
+  if (!user) return <div className="wrap"><div className="card muted">Connecte-toi pour voir tes messages.</div></div>;
+  return (
+    <div className="wrap"><h2>Mes messages</h2>
+      {l.length === 0 && <div className="muted">Aucune conversation. Touche « Écrire » sur une boutique.</div>}
+      {l.map((c) => <div className="card" key={c.id}><Link to={"/chat/" + c.shopId + "/" + c.clientId}><b>{c.ownerId === user.uid ? c.clientNom || "Client" : c.shopNom}</b></Link></div>)}
+    </div>
+  );
+}
+
+export function StoriesBar() {
+  const [l, setL] = useState([]); const [o, setO] = useState(null);
+  useEffect(() => { getDocs(query(collection(db, "stories"), where("expire", ">", Date.now()))).then((s) => setL(s.docs.map((d) => ({ id: d.id, ...d.data() })))).catch(() => {}); }, []);
+  if (!l.length) return null;
+  return (<>
+    <div className="chips" style={{ marginBottom: 10 }}>{l.map((s) => <button key={s.id} className="chip" style={{ padding: 4, background: "none" }} onClick={() => setO(s)}><img src={s.photo} alt="" style={{ width: 60, height: 60, borderRadius: "50%", objectFit: "cover", border: "3px solid var(--orange)" }} /><div className="meta" style={{ fontSize: 12, maxWidth: 64, overflow: "hidden" }}>{s.shopNom}</div></button>)}</div>
+    {o && <div onClick={() => setO(null)} style={{ position: "fixed", inset: 0, background: "#000d", zIndex: 20, display: "grid", placeItems: "center", padding: 16, textAlign: "center", color: "#fff" }}><div><img src={o.photo} alt="" style={{ maxWidth: "100%", maxHeight: "65vh", borderRadius: 16 }} /><p>{o.texte}</p><Link className="btn" to={"/boutique/" + o.shopId}>Voir la boutique</Link></div></div>}
+  </>);
+}
+
+export function StoryAdd({ shop }) {
+  const [t, setT] = useState("");
+  return (
+    <div className="card"><b>Story du jour (24 h)</b>
+      <input placeholder="Texte (ex : Foufou -20 % aujourd'hui)" value={t} onChange={(e) => setT(e.target.value)} />
+      <input type="file" accept="image/*" onChange={async (e) => { const f = e.target.files[0]; if (!f) return; await addDoc(collection(db, "stories"), { shopId: shop.id, ownerId: shop.ownerId, shopNom: shop.nom, photo: await compress(f), texte: t, expire: Date.now() + 864e5 }); setT(""); alert("Story publiée pour 24 h."); }} />
     </div>
   );
 }
