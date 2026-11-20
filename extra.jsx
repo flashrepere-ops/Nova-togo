@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { collection, doc, getDoc, getDocs, setDoc, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, serverTimestamp, query, where } from "firebase/firestore";
 import { db } from "./firebase";
 import { ADMIN_EMAIL } from "./firebaseConfig";
-import { VILLES } from "./data";
+import { VILLES, fmt } from "./data";
 
 export const initTheme = () => {
   document.documentElement.dataset.theme = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
@@ -85,6 +85,66 @@ export function Taxi() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+export const voice = (set) => {
+  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!R) return alert("La recherche vocale n'est pas disponible sur ce navigateur.");
+  const r = new R(); r.lang = "fr-FR"; r.onresult = (e) => set(e.results[0][0].transcript); r.start();
+};
+
+const promoOn = (x) => x.prix_promo && (!x.fin || x.fin > Date.now());
+export const priceNow = (x) => (promoOn(x) ? x.prix_promo : x.prix);
+export function Price({ x }) {
+  if (!promoOn(x)) return <span className="prix">{fmt(x.prix)}</span>;
+  const pct = Math.round(100 - (x.prix_promo * 100) / x.prix);
+  const ms = x.fin ? x.fin - Date.now() : 0;
+  return (
+    <span><s className="meta">{fmt(x.prix)}</s> <span className="prix">{fmt(x.prix_promo)}</span>{" "}
+      <span className="badge" style={{ background: "var(--rouge)", color: "#fff" }}>-{pct}%</span>
+      {x.fin && <div className="meta">Il reste {Math.floor(ms / 36e5)}h {Math.floor((ms % 36e5) / 6e4)}min</div>}
+    </span>
+  );
+}
+
+export async function orderProduct(user, shop, x) {
+  if (!user) return alert("Connecte-toi pour commander.");
+  const liv = confirm("Livraison à domicile ?\nOK = Livrez-moi\nAnnuler = Je viens chercher");
+  const adr = liv ? prompt("Ton adresse (quartier, repère) :") : "";
+  if (liv && !adr) return;
+  const total = priceNow(x);
+  await addDoc(collection(db, "orders"), { clientId: user.uid, client: user.displayName || user.email, shopId: shop.id, shopOwnerId: shop.ownerId, shopNom: shop.nom, produit: x.nom, total, livraison: liv, adresse: adr, statut: "envoyee", date: serverTimestamp() });
+  window.open(wa(shop.whatsapp, "Bonjour, je commande : " + x.nom + " (" + fmt(total) + "). " + (liv ? "Livraison à : " + adr : "Je viens chercher.") + " (NOVA-TOGO)"));
+}
+
+export function Orders({ user }) {
+  const [mine, setMine] = useState([]);
+  const [recv, setRecv] = useState([]);
+  const load = () => {
+    if (!user) return;
+    const g = (f) => getDocs(query(collection(db, "orders"), where(f, "==", user.uid)))
+      .then((s) => s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0)));
+    g("clientId").then(setMine).catch(() => {}); g("shopOwnerId").then(setRecv).catch(() => {});
+  };
+  useEffect(load, [user?.uid]);
+  if (!user) return <div className="wrap"><div className="card muted">Connecte-toi pour voir tes commandes.</div></div>;
+  const pts = mine.filter((o) => o.statut === "livree").reduce((a, o) => a + Math.floor(o.total / 100), 0);
+  const niv = pts >= 500 ? "VIP OR" : pts >= 200 ? "VIP" : pts >= 50 ? "Fidèle" : "Nouveau";
+  const set = async (id, statut) => { await updateDoc(doc(db, "orders", id), { statut }); load(); };
+  return (
+    <div className="wrap">
+      <div className="hero"><h1>{pts} points NOVA</h1>Niveau : <b>{niv}</b><div style={{ fontSize: 13, marginTop: 6 }}>100 F dépensés = 1 point (commande livrée). 100 points = 1 livraison offerte, 200 points = 1 plat offert chez un partenaire.</div></div>
+      <h2>Mes commandes</h2>
+      {mine.length === 0 && <div className="muted">Aucune commande pour le moment.</div>}
+      {mine.map((o) => <div className="card" key={o.id}><b>{o.produit}</b> <span className="prix">{fmt(o.total)}</span><div className="meta">{o.shopNom} • {o.livraison ? "Livraison" : "Retrait"} • {o.statut === "livree" ? "✅ Livrée" : "⏳ Envoyée"}</div></div>)}
+      {recv.length > 0 && <h2>Commandes reçues</h2>}
+      {recv.map((o) => (
+        <div className="card" key={o.id}><b>{o.produit}</b> <span className="prix">{fmt(o.total)}</span>
+          <div className="meta">{o.client} • {o.livraison ? "Livraison : " + o.adresse : "Retrait"} • {o.statut === "livree" ? "✅ Livrée" : "⏳ À livrer"}</div>
+          {o.statut !== "livree" && <button className="btn sm" style={{ marginTop: 8 }} onClick={() => set(o.id, "livree")}>Marquer livrée</button>}
+        </div>))}
     </div>
   );
 }

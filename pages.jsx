@@ -5,7 +5,7 @@ import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, updateDoc,
 import { auth, db, google } from "./firebase";
 import { ADMIN_EMAIL } from "./firebaseConfig";
 import { VILLES, CATEGORIES, fmt } from "./data";
-import { Avatar, compress } from "./extra.jsx";
+import { Avatar, compress, voice, Price, orderProduct } from "./extra.jsx";
 
 const initial = (s) => (s || "?").trim().charAt(0).toUpperCase();
 const waLink = (n) => "https://wa.me/" + String(n || "").replace(/\D/g, "");
@@ -57,6 +57,7 @@ export function Home() {
         <h1>Trouve tout près de chez toi</h1>
         <select value={ville} onChange={(e) => setVille(e.target.value)}>{VILLES.map((v) => <option key={v}>{v}</option>)}</select>
         <input placeholder={"Cherche un service à " + ville} value={q} onChange={(e) => setQ(e.target.value)} />
+        <button type="button" className="btn sm" style={{ marginTop: 8, background: "#2563EB" }} onClick={() => voice(setQ)}>🎤 Parler pour chercher</button>
       </div>
       <div className="chips">
         <button className={"chip" + (!cat ? " on" : "")} onClick={() => setCat("")}>Tout</button>
@@ -78,7 +79,7 @@ export function ShopPage({ user }) {
   const [products, setProducts] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [fav, setFav] = useState(false);
-  const [p, setP] = useState({ nom: "", prix: "", description: "" });
+  const [p, setP] = useState({ nom: "", prix: "", promo: "", fin: "", description: "" });
   const [r, setR] = useState({ etoiles: 5, commentaire: "" });
 
   const load = async () => {
@@ -105,8 +106,8 @@ export function ShopPage({ user }) {
     e.preventDefault();
     const max = shop.premium ? 10 : 3;
     if (products.length >= max) return alert("Limite de " + max + " produits. Passe en Premium pour en ajouter plus.");
-    await addDoc(collection(db, "shops", id, "products"), { nom: p.nom, prix: Number(p.prix), description: p.description });
-    setP({ nom: "", prix: "", description: "" }); load();
+    await addDoc(collection(db, "shops", id, "products"), { nom: p.nom, prix: Number(p.prix), prix_promo: p.promo ? Number(p.promo) : null, fin: p.fin ? new Date(p.fin + "T23:59:59").getTime() : null, description: p.description });
+    setP({ nom: "", prix: "", promo: "", fin: "", description: "" }); load();
   };
   const addReview = async (e) => {
     e.preventDefault();
@@ -139,9 +140,10 @@ export function ShopPage({ user }) {
       {products.map((x) => (
         <div className="card" key={x.id}>
           <div className="row" style={{ justifyContent: "space-between" }}>
-            <b>{x.nom}</b><span className="prix">{fmt(x.prix)}</span>
+            <b>{x.nom}</b><Price x={x} />
           </div>
           <div className="meta">{x.description}</div>
+          {!mine && <button className="btn sm" style={{ marginTop: 8 }} onClick={() => orderProduct(user, shop, x)}>Commander</button>}
           {mine && <button className="btn red sm" style={{ marginTop: 8 }} onClick={async () => { await deleteDoc(doc(db, "shops", id, "products", x.id)); load(); }}>Supprimer</button>}
         </div>
       ))}
@@ -150,6 +152,8 @@ export function ShopPage({ user }) {
           <b>Ajouter un produit</b>
           <input required placeholder="Nom (ex : Chambre climatisée)" value={p.nom} onChange={(e) => setP({ ...p, nom: e.target.value })} />
           <input required type="number" min="0" placeholder="Prix en F" value={p.prix} onChange={(e) => setP({ ...p, prix: e.target.value })} />
+          <input type="number" min="0" placeholder="Prix promo en F (facultatif)" value={p.promo} onChange={(e) => setP({ ...p, promo: e.target.value })} />
+          <input type="date" value={p.fin} onChange={(e) => setP({ ...p, fin: e.target.value })} />
           <input placeholder="Description" value={p.description} onChange={(e) => setP({ ...p, description: e.target.value })} />
           <button className="btn">Ajouter</button>
         </form>
@@ -218,6 +222,7 @@ export function Profile({ user }) {
   return (
     <div className="wrap">
       <div className="card row"><div className="avatar">{initial(user.displayName || user.email)}</div><div><b>{user.displayName || "Mon compte"}</b><div className="meta">{user.email}</div></div></div>
+      <Link className="btn big" to="/commandes" style={{ display: "block", marginBottom: 12 }}>Mes commandes et points NOVA</Link>
       <h2>Mes boutiques</h2>
       {mes.length === 0 && <div className="muted">Pas encore de boutique. <Link to="/devenir-commercant">En créer une</Link></div>}
       {mes.map((s) => (
