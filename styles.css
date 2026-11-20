@@ -88,3 +88,42 @@ nav.bar a.on{color:#FFA070}nav.bar a span{display:block;font-size:22px}
 .three{flex-wrap:nowrap;margin:14px 0}
 .star-btn{background:none;border:0;font-size:32px;color:var(--gris2);cursor:pointer;transition:transform .15s}.star-btn.on{color:#FF9F43}.star-btn:active{transform:scale(1.3)}
 .star svg{color:#FF9F43}
+
+/* ===== LIQUID GLASS : épaisseur, reflets, bord irisé ===== */
+.app{background:
+ radial-gradient(520px 430px at 94% 12%,rgba(255,140,90,.5),transparent 70%),
+ radial-gradient(460px 400px at 0% 64%,rgba(255,107,53,.42),transparent 70%),
+ radial-gradient(560px 520px at 100% 96%,rgba(255,120,70,.9),transparent 66%),
+ radial-gradient(620px 520px at 0% 0%,rgba(160,100,255,.65),transparent 65%),
+ linear-gradient(170deg,#2A0E6B 0%,#4A1FA3 45%,#6A2B9E 72%,#A04A8A 100%)}
+.app::before{z-index:0}
+.app::after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;filter:blur(2px);
+ background:radial-gradient(circle at 12% 80%,rgba(255,150,100,.4) 0 40px,transparent 44px),radial-gradient(circle at 92% 58%,rgba(255,255,255,.15) 0 54px,transparent 58px),radial-gradient(circle at 76% 9%,rgba(255,255,255,.11) 0 34px,transparent 38px)}
+.app>*{z-index:1}
+.glass,.card,.pill,.rowlink,.tile,.panel,.info,.banner,.btn-g,.chip,.rb,.titlebar,.mini-card,nav.bar{
+ background:linear-gradient(135deg,rgba(255,255,255,.30) 0%,rgba(255,255,255,.10) 38%,rgba(255,255,255,.05) 62%,rgba(255,150,100,.22) 100%);
+ backdrop-filter:blur(22px) saturate(1.35) brightness(1.04);-webkit-backdrop-filter:blur(22px) saturate(1.35) brightness(1.04);border:0;
+ box-shadow:inset 0 1.5px 1px rgba(255,255,255,.75),inset 1.5px 0 1px rgba(255,255,255,.3),inset 0 -2px 3px rgba(255,150,100,.55),inset -1.5px 0 3px rgba(150,90,255,.45),inset 0 0 28px rgba(255,255,255,.08),0 16px 34px rgba(12,3,45,.4)}
+.glass,.card,.pill,.rowlink,.tile,.panel,.info,.banner,.btn-g,.chip,.rb,.titlebar,.mini-card{position:relative}
+nav.bar{position:fixed}
+.glass::after,.card::after,.pill::after,.rowlink::after,.tile::after,.panel::after,.info::after,.banner::after,.btn-g::after,.chip::after,.rb::after,.titlebar::after,.mini-card::after,nav.bar::after,.orb::after,.btn::after{
+ content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;pointer-events:none;
+ background:conic-gradient(from 200deg,rgba(255,255,255,.95),rgba(255,255,255,.12) 22%,rgba(255,170,120,.8) 52%,rgba(255,255,255,.1) 78%,rgba(255,255,255,.95));
+ -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.panel::before,.card::before,.tile::before{content:"";position:absolute;left:8%;right:38%;top:0;height:38%;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.22),transparent);pointer-events:none}
+.info{background:linear-gradient(135deg,rgba(255,255,255,.22),rgba(70,35,140,.5) 55%,rgba(255,140,90,.25))}
+.chip.on{background:linear-gradient(135deg,#FF8A50,#B05BE0 60%,#7C3AED)}
+.orb{position:relative;background:
+ radial-gradient(circle at 27% 20%,rgba(255,255,255,.8) 0,rgba(255,255,255,.18) 16%,transparent 34%),
+ radial-gradient(circle at 74% 92%,rgba(255,130,70,.95),transparent 58%),
+ radial-gradient(circle at 50% 45%,rgba(124,58,237,.5),rgba(55,18,135,.8));
+ border:0;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.3),inset 0 14px 22px rgba(255,255,255,.2),inset 0 -14px 26px rgba(255,120,60,.55),0 18px 34px rgba(10,0,40,.5)}
+.orb.sos{background:radial-gradient(circle at 27% 20%,rgba(255,255,255,.8) 0,rgba(255,255,255,.18) 16%,transparent 34%),radial-gradient(circle at 74% 92%,rgba(255,110,60,.95),transparent 58%),radial-gradient(circle at 50% 45%,rgba(160,60,200,.5),rgba(90,20,120,.8))}
+.btn{position:relative;border:0;background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,0) 48%),linear-gradient(135deg,#7C3AED,#FF6B35);box-shadow:inset 0 1.5px 1px rgba(255,255,255,.7),inset 0 -2px 5px rgba(0,0,0,.25),0 10px 24px rgba(124,58,237,.5)}
+.btn.red{background:linear-gradient(180deg,rgba(255,255,255,.45),rgba(255,255,255,0) 48%),linear-gradient(180deg,#F25757,#B91C1C)}
+.btn.line{background:linear-gradient(135deg,rgba(255,255,255,.3),rgba(255,255,255,.06))}
+.mic{background:linear-gradient(135deg,rgba(255,255,255,.3),rgba(255,255,255,.06));border:2px solid #FF8A50}
+.pro-img{box-shadow:inset 0 1.5px 1px rgba(255,255,255,.7),inset 0 -2px 4px rgba(255,150,100,.6),0 20px 40px rgba(12,3,45,.45);border:0}
+.chip,.btn-g,.rb{box-shadow:inset 0 1.5px 1px rgba(255,255,255,.7),inset 0 -2px 3px rgba(255,150,100,.5),0 6px 14px rgba(12,3,45,.28)}
+.chips{padding:6px 2px 14px}
+.pill{background:linear-gradient(135deg,rgba(255,255,255,.26),rgba(255,255,255,.07) 45%,rgba(255,150,100,.2))}
