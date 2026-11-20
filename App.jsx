@@ -23,14 +23,9 @@ export default function App() {
   if (user === undefined) return <div className="muted">Chargement…</div>;
   return (
     <div className="app">
-      <header className="top">
-        <Link to="/" className="logo">NOVA-TOGO<i /></Link>
-        <div className="row"><Link to="/urgence" style={{textDecoration:"none",fontSize:22}} aria-label="Urgence">🆘</Link><ThemeBtn />
-        {user ? <Link to="/profil" className="meta">{user.displayName || user.email}</Link>
-              : <Link to="/connexion" className="btn sm">{t("Se connecter")}</Link>}</div>
-      </header>
+      
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Home user={user} />} />
         <Route path="/boutique/:id" element={<ShopPage user={user} />} />
         <Route path="/connexion" element={<Login user={user} />} />
         <Route path="/profil" element={<Profile user={user} />} />
@@ -46,11 +41,9 @@ export default function App() {
         <Route path="/admin" element={<Admin user={user} />} />
       </Routes>
       <nav className="bar">
-        <NavLink to="/" end className={({isActive})=>isActive?"on":""}><span>🏠</span>{t("Accueil")}</NavLink>
-        <NavLink to="/taxi" className={({isActive})=>isActive?"on":""}><span>🚕</span>{t("Taxi")}</NavLink>
-        <NavLink to="/favoris" className={({isActive})=>isActive?"on":""}><span>❤️</span>{t("Favoris")}</NavLink>
-        <NavLink to="/devenir-commercant" className={({isActive})=>isActive?"on":""}><span>🏪</span>{t("Ma boutique")}</NavLink>
-        <NavLink to="/profil" className={({isActive})=>isActive?"on":""}><span>👤</span>{t("Profil")}</NavLink>
+        {[["/", "🏠", "Accueil"], ["/commandes", "📋", "Commandes"], ["/favoris", "❤️", "Favoris"], ["/messages", "💬", "Chat"], ["/profil", "👤", "Profil"]].map(([to, ic, lb]) => (
+          <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => (isActive ? "on" : "")}><span>{ic}</span>{t(lb)}</NavLink>
+        ))}
       </nav>
     </div>
   );

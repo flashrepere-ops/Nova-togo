@@ -13,24 +13,21 @@ const sorted = (l) => [...l].sort((a, b) => (b.premium ? 1 : 0) - (a.premium ? 1
 
 function ShopCard({ s }) {
   return (
-    <div className="card">
-      <Link to={"/boutique/" + s.id} className="shop">
-        <Avatar s={s} />
-        <div>
-          <b>{s.nom}</b> {s.premium && <span className="badge">PREMIUM</span>}
-          <div className="meta">{s.categorie} • {s.quartier}, {s.ville}{s.km != null && " • " + s.km.toFixed(1) + " km"}</div>
-          <div className="meta">{s.description?.slice(0, 70)}</div>
-        </div>
+    <div className="pro">
+      <Link to={"/boutique/" + s.id} className="pro-img" style={s.photo ? { backgroundImage: "url(" + s.photo + ")" } : undefined}>
+        {s.km != null && <span className="mini">📍 Autour de vous • {s.km.toFixed(1)} km</span>}
+        {!s.photo && <span className="pro-letter">{initial(s.nom)}</span>}
+        {s.premium && <span className="prem">👑 PREMIUM</span>}
+        <div className="glass info"><b>{s.nom}{s.premium && " • PREMIUM"}</b>
+          <div>{s.categorie} • {s.quartier}, {s.ville}</div>
+          <div className="meta">{s.description?.slice(0, 50)}{s.dispo && <span><span className="dot" />Disponible maintenant</span>}</div></div>
       </Link>
-      <div className="row" style={{ marginTop: 10 }}>
-        <a className="btn sm" href={"tel:" + s.whatsapp}>Appeler</a>
-        <a className="btn sm wa" href={waLink(s.whatsapp)} target="_blank" rel="noreferrer">WhatsApp</a>
-      </div>
+      <div className="row"><a className="btn-g" href={"tel:" + s.whatsapp}>📞 Appeler</a><a className="btn-g wa" href={waLink(s.whatsapp)} target="_blank" rel="noreferrer">WhatsApp</a></div>
     </div>
   );
 }
 
-export function Home() {
+export function Home({ user }) {
   const [ville, setVille] = useState(localStorage.getItem("ville") || "Lomé");
   const [cat, setCat] = useState("");
   const [pays, setPays] = useState(localStorage.getItem("pays") || "Togo");
@@ -56,31 +53,32 @@ export function Home() {
     (!cat || s.categorie === cat) && equip.every((e) => s.equip?.includes(e)) && (!maxp || (Number(s.prix_min) || 0) <= Number(maxp)) &&
     (!q || (s.nom + " " + s.description + " " + s.categorie).toLowerCase().includes(q.toLowerCase())));
 
+  const prenom = user ? user.displayName || user.email.split("@")[0] : "";
   return (
     <div className="wrap">
-      <StoriesBar />
-      <div className="hero">
-        <h1>{t("Trouve tout près de chez toi")}</h1>
-        <select value={pays} onChange={(e) => { localStorage.setItem("pays", e.target.value); setPays(e.target.value); setVille(PAYS[e.target.value].v[0]); }}>{Object.keys(PAYS).map((p) => <option key={p}>{p}</option>)}</select>
-        <select value={ville} onChange={(e) => setVille(e.target.value)}>{PAYS[pays].v.map((v) => <option key={v}>{v}</option>)}</select>
-        <input placeholder={"Cherche un service à " + ville} value={q} onChange={(e) => setQ(e.target.value)} />
-        <button type="button" className="btn sm" style={{ marginTop: 8, background: "#2563EB" }} onClick={() => voice(setQ)}>🎤 Parler pour chercher</button>
+      <div className="row between">
+        <div><h1 className="hello">Bonjour,<br />{prenom} 👋</h1><div className="sub">📍 {pays} • {ville}</div></div>
+        <Link to={user ? "/profil" : "/connexion"} className="ava-ring"><span className="c">{user?.photoURL ? <img src={user.photoURL} alt="" /> : (prenom || "?")[0].toUpperCase()}</span>{prenom || "Se connecter"}</Link>
       </div>
-      <div className="row" style={{ marginBottom: 12 }}><Link className="btn sm sos" to="/taxi">🚕 Taxi</Link><Link className="btn sm" style={{ background: "#2563EB" }} to="/livraison">🛵 Livraison</Link><Link className="btn sm red" to="/urgence">🆘 Urgence</Link></div>
+      <div className="glass pill"><span>🔍</span><input placeholder="Rechercher un service…" value={q} onChange={(e) => setQ(e.target.value)} /><button className="mic" onClick={() => voice(setQ)}>🎤<small>Voix</small></button></div>
+      <div className="orbs"><Link to="/taxi" className="orb">🚗<b>Taxi</b></Link><Link to="/livraison" className="orb">📦<b>Livraison</b></Link><Link to="/urgence" className="orb sos">🛡️<b>Urgence SOS</b></Link></div>
+      <StoriesBar />
+      <h2>Catégories</h2>
       <div className="chips">
         <button className={"chip" + (!cat ? " on" : "")} onClick={() => setCat("")}>Tout</button>
         {CATEGORIES.map((c) => <button key={c} className={"chip" + (cat === c ? " on" : "")} onClick={() => setCat(c)}>{c}</button>)}
       </div>
       <div className="row" style={{ marginBottom: 8 }}>
-        <button className="chip" onClick={() => navigator.geolocation.getCurrentPosition((p) => setPos({ lat: p.coords.latitude, lng: p.coords.longitude }), () => alert("Active le GPS pour trier par distance."))}>📍 Plus proches</button>
+        <select style={{ width: "auto", marginBottom: 0 }} value={pays} onChange={(e) => { localStorage.setItem("pays", e.target.value); setPays(e.target.value); setVille(PAYS[e.target.value].v[0]); }}>{Object.keys(PAYS).map((x) => <option key={x}>{x}</option>)}</select>
+        <select style={{ width: "auto", marginBottom: 0 }} value={ville} onChange={(e) => setVille(e.target.value)}>{PAYS[pays].v.map((v) => <option key={v}>{v}</option>)}</select>
+        <button className="chip" onClick={() => navigator.geolocation.getCurrentPosition((x) => setPos({ lat: x.coords.latitude, lng: x.coords.longitude }), () => alert("Active le GPS pour trier par distance."))}>📍 Plus proches</button>
         {cat === "Hôtel" && EQUIP.map((e) => <button key={e} className={"chip" + (equip.includes(e) ? " on" : "")} onClick={() => setEquip(equip.includes(e) ? equip.filter((x) => x !== e) : [...equip, e])}>{e}</button>)}
       </div>
       {cat === "Hôtel" && <input type="number" placeholder="Prix maximum (F)" value={maxp} onChange={(e) => setMaxp(e.target.value)} />}
+      <div className="row between"><h2>Prestataires à proximité</h2><span className="link">Voir tout ›</span></div>
       {loading && <div className="muted">Chargement…</div>}
       {err && <div className="err">{err}</div>}
-      {!loading && !err && list.length === 0 && (
-        <div className="muted">Aucun commerçant ici pour le moment.<br /><Link to="/devenir-commercant">Inscris ta boutique gratuitement</Link></div>
-      )}
+      {!loading && !err && list.length === 0 && <div className="muted">Aucun commerçant ici pour le moment.<br /><Link className="link" to="/devenir-commercant">Inscris ta boutique gratuitement</Link></div>}
       {list.map((s) => <ShopCard key={s.id} s={s} />)}
     </div>
   );
@@ -88,6 +86,7 @@ export function Home() {
 
 export function ShopPage({ user }) {
   const { id } = useParams();
+  const nav = useNavigate();
   const [shop, setShop] = useState(null);
   const [products, setProducts] = useState([]);
   const [reviews, setReviews] = useState([]);
@@ -132,6 +131,9 @@ export function ShopPage({ user }) {
 
   return (
     <div className="wrap">
+      <div className="cover" style={shop.photo ? { backgroundImage: "url(" + shop.photo + ")" } : undefined}>
+        <div className="topbar"><button className="rb" onClick={() => nav(-1)}>‹</button><span className="glass titlebar">Boutique</span><button className="rb" onClick={() => (navigator.share ? navigator.share({ title: shop.nom, url: location.href }) : navigator.clipboard?.writeText(location.href))}>⤴</button></div>
+      </div>
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div className="shop"><Avatar s={shop} />
@@ -231,25 +233,37 @@ export function Login({ user }) {
 
 export function Profile({ user }) {
   const [mes, setMes] = useState([]);
+  const [cmd, setCmd] = useState({ n: 0, pts: 0 });
   useEffect(() => {
-    if (user) getDocs(query(collection(db, "shops"), where("ownerId", "==", user.uid))).then((s) => setMes(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    if (!user) return;
+    getDocs(query(collection(db, "shops"), where("ownerId", "==", user.uid))).then((s) => setMes(s.docs.map((d) => ({ id: d.id, ...d.data() })))).catch(() => {});
+    getDocs(query(collection(db, "orders"), where("clientId", "==", user.uid))).then((s) => { const o = s.docs.map((d) => d.data()); setCmd({ n: o.length, pts: o.filter((x) => x.statut === "livree").reduce((a, x) => a + Math.floor(x.total / 100), 0) }); }).catch(() => {});
   }, [user?.uid]);
   if (!user) return <div className="wrap"><div className="card muted">Connecte-toi pour voir ton profil.<br /><br /><Link className="btn" to="/connexion">Se connecter</Link></div></div>;
+  const nom = user.displayName || user.email.split("@")[0];
+  const row = (to, ico, bg, txt) => <Link key={to} className="glass rowlink" to={to}><span className="ico" style={{ background: bg }}>{ico}</span><b>{txt}</b><span>›</span></Link>;
   return (
     <div className="wrap">
-      <div className="card row"><div className="avatar">{initial(user.displayName || user.email)}</div><div><b>{user.displayName || "Mon compte"}</b><div className="meta">{user.email}</div></div></div>
-      <Link className="btn big" to="/commandes" style={{ display: "block", marginBottom: 12 }}>Mes commandes et points NOVA</Link>
-      <Link className="btn line" to="/messages" style={{ display: "block", marginBottom: 12, textAlign: "center" }}>💬 Mes messages</Link>
-      <Link className="btn line" to="/parametres" style={{ display: "block", marginBottom: 12, textAlign: "center" }}>⚙️ Paramètres</Link>
-      <a className="btn wa" style={{ display: "block", marginBottom: 12, textAlign: "center" }} href={"https://wa.me/?text=" + encodeURIComponent("Télécharge NOVA-TOGO, l'app pour trouver tout au Togo : taxi, hôtel, pharmacie, marché, livraison. " + location.href.split("#")[0] + "#/?ref=" + user.uid)} target="_blank" rel="noreferrer">Inviter un ami sur WhatsApp</a>
-      <h2>Mes boutiques</h2>
-      {mes.length === 0 && <div className="muted">Pas encore de boutique. <Link to="/devenir-commercant">En créer une</Link></div>}
-      {mes.map((s) => (
-        <div className="card" key={s.id}><Link to={"/boutique/" + s.id}><b>{s.nom}</b></Link>
-          <div className="meta">{s.statut === "valide" ? "✅ Visible" : "⏳ En attente de validation (24 h)"}</div></div>
-      ))}
-      {user.email === ADMIN_EMAIL && <Link className="btn big" to="/admin" style={{ display: "block", marginBottom: 10 }}>Panneau admin</Link>}
-      <button className="btn red" onClick={() => signOut(auth)}>Se déconnecter</button>
+      <div className="row between" style={{ marginBottom: 14 }}><span style={{ width: 90 }} /><b style={{ letterSpacing: ".15em" }}>NOVA-TOGO</b>
+        <span className="row" style={{ flexWrap: "nowrap" }}><Link className="rb" style={{ display: "grid", placeItems: "center", textDecoration: "none" }} to="/messages">🔔</Link><Link className="rb" style={{ display: "grid", placeItems: "center", textDecoration: "none" }} to="/parametres">⚙️</Link></span></div>
+      <div className="glass panel" style={{ position: "relative" }}>
+        <div className="row" style={{ flexWrap: "nowrap" }}><div className="avatar" style={{ width: 84, height: 84, fontSize: 38 }}>{nom[0].toUpperCase()}</div><div><b style={{ fontSize: 22 }}>{nom}</b><div className="meta">{user.email}</div></div></div>
+        <span className="badge" style={{ position: "absolute", top: 14, right: 14 }}>✦ {cmd.pts} POINTS NOVA</span>
+        <div className="glass stats"><div>Commandes<b>📦 {cmd.n}</b></div><div>Points<b>☆ {cmd.pts}</b></div><div>Boutiques<b>🏪 {mes.length}</b></div></div>
+      </div>
+      <div className="sub" style={{ margin: "6px 4px" }}>Mon compte</div>
+      {row("/commandes", "📦", "linear-gradient(135deg,#7C3AED,#3B82F6)", "Mes commandes et points NOVA")}
+      {row("/messages", "💬", "linear-gradient(135deg,#6366F1,#7C3AED)", "Mes messages")}
+      {row("/parametres", "⚙️", "linear-gradient(135deg,#16A34A,#4ADE80)", "Paramètres")}
+      <a className="glass rowlink" target="_blank" rel="noreferrer" href={"https://wa.me/?text=" + encodeURIComponent("Télécharge NOVA-TOGO, l'app pour trouver tout au Togo : taxi, hôtel, pharmacie, marché, livraison. " + location.href.split("#")[0] + "#/?ref=" + user.uid)}><span className="ico" style={{ background: "#22C55E" }}>📱</span><b>Inviter un ami sur WhatsApp</b><span>›</span></a>
+      <div className="sub" style={{ margin: "10px 4px 6px" }}>Boutique</div>
+      <div className="dash">
+        <div className="row"><span className="ico" style={{ background: "linear-gradient(135deg,#EF4444,#FF6B35)" }}>🏪</span><div><b style={{ fontSize: 19 }}>Mes boutiques</b>{mes.length === 0 && <div className="meta">Pas encore de boutique</div>}</div></div>
+        {mes.map((s) => <div key={s.id} style={{ margin: "8px 0" }}><Link className="link" to={"/boutique/" + s.id}>{s.nom}</Link> <span className="meta">{s.statut === "valide" ? "✅ Visible" : "⏳ En attente (24 h)"}</span></div>)}
+        <Link className="btn big" to="/devenir-commercant" style={{ marginTop: 10 }}>+ En créer une</Link>
+      </div>
+      {user.email === ADMIN_EMAIL && <><div className="sub" style={{ margin: "6px 4px" }}>Administration</div>{row("/admin", "🛡️", "linear-gradient(135deg,#7C3AED,#A78BFA)", "Panneau admin")}</>}
+      <button className="btn red big" style={{ marginTop: 14 }} onClick={() => signOut(auth)}>Se déconnecter</button>
     </div>
   );
 }
@@ -294,12 +308,27 @@ export function NewShop({ user }) {
 
 export function Favorites({ user }) {
   const [l, setL] = useState([]);
-  useEffect(() => { if (user) getDocs(collection(db, "users", user.uid, "favorites")).then((s) => setL(s.docs.map((d) => ({ id: d.id, ...d.data() })))); }, [user?.uid]);
+  const [d, setD] = useState([]);
+  const ville = localStorage.getItem("ville") || "Lomé";
+  useEffect(() => {
+    if (user) getDocs(collection(db, "users", user.uid, "favorites")).then((s) => setL(s.docs.map((x) => ({ id: x.id, ...x.data() })))).catch(() => {});
+    getDocs(query(collection(db, "shops"), where("statut", "==", "valide"), where("ville", "==", ville))).then((s) => setD(s.docs.slice(0, 2).map((x) => ({ id: x.id, ...x.data() })))).catch(() => {});
+  }, [user?.uid]);
   if (!user) return <div className="wrap"><div className="card muted">Connecte-toi pour voir tes favoris.<br /><br /><Link className="btn" to="/connexion">Se connecter</Link></div></div>;
+  const nom = user.displayName || user.email.split("@")[0];
   return (
-    <div className="wrap"><h2>Mes favoris</h2>
-      {l.length === 0 && <div className="muted">Aucun favori. Touche le cœur sur une boutique.</div>}
-      {l.map((x) => <div className="card" key={x.id}><Link to={"/boutique/" + x.id}><b>{x.nom}</b></Link></div>)}
+    <div className="wrap">
+      <div className="sub">Bonjour, {nom} ✨</div><div className="sub">Découvrez et sauvegardez vos boutiques préférées</div>
+      <h1 className="hello big">Mes favoris</h1>
+      {l.length === 0 ? (
+        <div className="center">
+          <svg viewBox="0 0 100 90" width="190"><defs><linearGradient id="hg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FFD6E0" /><stop offset=".5" stopColor="#FF9E80" /><stop offset="1" stopColor="#C77DFF" /></linearGradient></defs><path d="M50 85 L8 40 Q-2 20 18 8 Q38 0 50 22 Q62 0 82 8 Q102 20 92 40 Z" fill="url(#hg)" stroke="#fff" strokeOpacity=".7" strokeWidth="1.5" /><path d="M50 22 L30 8 M50 22 L70 8 M50 22 L50 85 M8 40 L50 22 L92 40" stroke="#fff" strokeOpacity=".5" fill="none" /></svg>
+          <h2>Aucun favori</h2><div className="sub">Touche le cœur sur une boutique pour l'ajouter ici</div>
+        </div>
+      ) : l.map((x) => <Link key={x.id} className="glass rowlink" to={"/boutique/" + x.id}><b>{x.nom}</b><span>›</span></Link>)}
+      {d.length > 0 && <div className="glass panel"><div className="eyebrow">✦ À DÉCOUVRIR À {ville.toUpperCase()} ✦</div>
+        <div className="two">{d.map((s) => <Link key={s.id} className="glass mini-card" to={"/boutique/" + s.id}><Avatar s={s} /><b style={{ display: "block", marginTop: 8 }}>{s.nom}</b><div className="meta">{s.categorie} • {s.quartier}</div></Link>)}</div></div>}
+      <Link className="btn big" to="/" style={{ marginTop: 14 }}>✦ Explorer les boutiques</Link>
     </div>
   );
 }
@@ -310,18 +339,21 @@ export function Admin({ user }) {
   useEffect(() => { if (user?.email === ADMIN_EMAIL) load(); }, [user?.uid]);
   if (user?.email !== ADMIN_EMAIL) return <div className="wrap"><div className="card muted">Accès réservé à l'administrateur.</div></div>;
   const act = async (id, data) => { await updateDoc(doc(db, "shops", id), data); load(); };
-  const wait = shops.filter((s) => s.statut === "en_attente");
+  const wait = shops.filter((s) => s.statut === "en_attente").length, prem = shops.filter((s) => s.premium).length;
   return (
     <div className="wrap">
-      <div className="card"><b>{shops.length}</b> boutiques • <b>{wait.length}</b> en attente • <b>{shops.filter((s) => s.premium).length}</b> premium • Revenu Premium estimé : <b>{fmt(shops.filter((s) => s.premium).length * 5000)}</b> / mois</div>
-      {shops.map((s) => (
+      <div className="center"><div className="sub">Admin · NOVA-TOGO</div><h1 className="hello">Tableau de bord</h1></div>
+      <div className="tiles">{[["🏪", shops.length, "Boutiques"], ["⏳", wait, "En attente"], ["👑", prem, "Premium"]].map(([ic, n, lb]) => <div className="glass tile" key={lb}><div style={{ fontSize: 28 }}>{ic}</div><b>{n}</b>{lb}</div>)}</div>
+      <div className="banner"><div className="crown">👑</div><div><span className="chip on">Revenu Premium estimé</span><div className="big">{fmt(prem * 5000)} / mois</div></div></div>
+      <div className="row between"><h2>Boutiques</h2><Link className="link" to="/devenir-commercant">+ Ajouter</Link></div>
+      {shops.map((s, i) => (
         <div className="card" key={s.id}>
-          <b>{s.nom}</b> <span className="meta">{s.categorie} • {s.ville} • {s.statut}</span>
-          <div className="meta">{s.whatsapp}</div>
-          <div className="row" style={{ marginTop: 8 }}>
+          <div className="row" style={{ flexWrap: "nowrap" }}><Avatar s={s} /><div><b style={{ fontSize: 20 }}>Boutique {i + 1}</b><div className="meta">{s.nom} — {s.categorie} · {s.ville}</div></div></div>
+          <div className="row" style={{ margin: "10px 0" }}><span className={"chip" + (s.statut === "valide" ? " okc" : "")}>{s.statut === "valide" ? "✔ Valide" : "⏳ En attente"}</span>{s.premium && <span className="chip gold">👑 Premium</span>}<span className="chip">📞 {s.whatsapp}</span></div>
+          <div className="row">
             {s.statut !== "valide" && <button className="btn sm" onClick={() => act(s.id, { statut: "valide" })}>Valider</button>}
-            <button className="btn sm line" onClick={() => act(s.id, { premium: !s.premium })}>{s.premium ? "Retirer Premium" : "Mettre Premium"}</button>
-            <button className="btn sm red" onClick={async () => { if (confirm("Supprimer ?")) { await deleteDoc(doc(db, "shops", s.id)); load(); } }}>Supprimer</button>
+            <button className={"btn sm" + (s.premium ? " gold" : "")} onClick={() => act(s.id, { premium: !s.premium })}>{s.premium ? "★ Retirer Premium" : "+ Mettre Premium"}</button>
+            <button className="btn sm line" onClick={async () => { if (confirm("Supprimer ?")) { await deleteDoc(doc(db, "shops", s.id)); load(); } }}>🗑 Supprimer</button>
           </div>
         </div>
       ))}

@@ -65,6 +65,7 @@ export function Taxi({ kind = "Taxi" }) {
   const [ville, setVille] = useState(localStorage.getItem("ville") || "Lomé");
   const [l, setL] = useState([]);
   const [f, setF] = useState({ depart: "", dest: "", pers: 1 });
+  const [typ, setTyp] = useState("Taxi Moto");
   useEffect(() => {
     getDocs(query(collection(db, "shops"), where("statut", "==", "valide"), where("ville", "==", ville)))
       .then((s) => setL(s.docs.map((d) => ({ id: d.id, ...d.data() })).filter((x) => x.categorie?.startsWith(kind)).sort((a, b) => (b.premium ? 1 : 0) - (a.premium ? 1 : 0))))
@@ -72,20 +73,29 @@ export function Taxi({ kind = "Taxi" }) {
   }, [ville]);
   const msg = "Bonjour, " + (kind === "Taxi" ? "je veux un taxi" : "je veux une livraison") + " à " + ville + ". Départ : " + f.depart + ". Destination : " + f.dest + ". Personnes : " + f.pers + ". (NOVA-TOGO)";
   const ok = f.depart && f.dest;
+  const shown = l.filter((y) => kind !== "Taxi" || typ === "Taxi" || y.categorie === typ);
   return (
     <div className="wrap">
-      <div className="hero sos"><h1>{kind === "Taxi" ? "Je veux un taxi" : "Je veux être livré"}</h1>
+      <h1 className="hello">{kind === "Taxi" ? "Où vas-tu ?" : "Je veux être livré"}</h1>
+      <div className="sub" style={{ marginBottom: 12 }}>{ville}, Togo • Aujourd'hui</div>
+      <div className="glass panel">
         <select value={ville} onChange={(e) => setVille(e.target.value)}>{VILLES.map((v) => <option key={v}>{v}</option>)}</select>
-        <input placeholder="Où es-tu ? (quartier, repère)" value={f.depart} onChange={(e) => setF({ ...f, depart: e.target.value })} />
-        <input placeholder="Où vas-tu ?" value={f.dest} onChange={(e) => setF({ ...f, dest: e.target.value })} />
+        <input placeholder="📍 Où es-tu ? (quartier, repère)" value={f.depart} onChange={(e) => setF({ ...f, depart: e.target.value })} />
+        <input placeholder="📍 Où vas-tu ?" value={f.dest} onChange={(e) => setF({ ...f, dest: e.target.value })} />
+        {kind === "Taxi" && <div className="row">{[["Taxi Moto", "🏍️ Taxi Moto"], ["Taxi", "🚕 Taxi"], ["Taxi Voiture", "🚗 Taxi Voiture"]].map(([k, lb]) => <button key={k} className={"chip" + (typ === k ? " on" : "")} onClick={() => setTyp(k)}>{lb}</button>)}</div>}
       </div>
-      {l.length === 0 && <div className="muted">Aucun {kind === "Taxi" ? "taximan" : "livreur"} à {ville} pour le moment.<br />Inscris-toi dans « Ma boutique », catégorie {kind === "Taxi" ? "Taxi Moto ou Taxi Voiture" : "Livreur"}.</div>}
-      {l.map((x) => (
-        <div className="card" key={x.id}>
-          <div className="shop"><Avatar s={x} /><div><b>{x.nom}</b> {x.premium && <span className="badge">PREMIUM</span>}<div className="meta">{x.categorie} • {x.quartier}</div></div></div>
+      {shown.length === 0 && (
+        <div className="center"><div style={{ fontSize: 80 }}>{kind === "Taxi" ? "🚕" : "🛵"}</div>
+          <h2>Aucun {kind === "Taxi" ? "taximan" : "livreur"} à {ville} pour le moment</h2>
+          <div className="sub">Sois le premier à proposer tes trajets et rejoins nos conducteurs.</div>
+          <Link className="btn big" to="/devenir-commercant" style={{ marginTop: 14 }}>Inscris-toi dans Ma boutique, catégorie {kind === "Taxi" ? "Taxi Moto ou Taxi Voiture" : "Livreur"}</Link></div>
+      )}
+      {shown.map((y) => (
+        <div className="card" key={y.id}>
+          <div className="shop"><Avatar s={y} /><div><b>{y.nom}</b> {y.premium && <span className="badge">PREMIUM</span>}<div className="meta">{y.categorie} • {y.quartier}</div></div></div>
           <div className="row" style={{ marginTop: 10 }}>
-            <a className="btn sm" href={"tel:" + x.whatsapp}>Appeler</a>
-            <a className="btn sm wa" style={ok ? {} : { opacity: .5, pointerEvents: "none" }} href={wa(x.whatsapp, msg)} target="_blank" rel="noreferrer">Demander par WhatsApp</a>
+            <a className="btn sm" href={"tel:" + y.whatsapp}>Appeler</a>
+            <a className="btn sm wa" style={ok ? {} : { opacity: .5, pointerEvents: "none" }} href={wa(y.whatsapp, msg)} target="_blank" rel="noreferrer">Demander par WhatsApp</a>
           </div>
         </div>
       ))}
