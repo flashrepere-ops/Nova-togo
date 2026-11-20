@@ -1,12 +1,10 @@
-// 1) Remplace ces valeurs par celles de ta console Firebase (Paramètres du projet > Tes applications)
 export const firebaseConfig = {
-  apiKey: "COLLE_ICI",
-  authDomain: "COLLE_ICI",
-  projectId: "COLLE_ICI",
-  storageBucket: "COLLE_ICI",
-  messagingSenderId: "COLLE_ICI",
-  appId: "COLLE_ICI",
+  apiKey: "AIzaSyD6TWD4XdTUMAIGhyf3FODSFUnTj7zjVi0",
+  authDomain: "nova-togo.firebaseapp.com",
+  projectId: "nova-togo",
+  storageBucket: "nova-togo.firebasestorage.app",
+  messagingSenderId: "21803607828",
+  appId: "1:21803607828:web:c63bdb01f3e55da86b0401",
 };
 
-// 2) Ton email d'administrateur (celui avec lequel tu te connectes pour valider les boutiques)
-export const ADMIN_EMAIL = "ton-email@gmail.com";
+export const ADMIN_EMAIL = "pilotepower2@gmail.com";
