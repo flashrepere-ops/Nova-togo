@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Ic } from "./icons.jsx";
+import { ART } from "./assets.js";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, updateProfile } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, updateDoc, query, where, serverTimestamp } from "firebase/firestore";
@@ -15,14 +17,14 @@ function ShopCard({ s }) {
   return (
     <div className="pro">
       <Link to={"/boutique/" + s.id} className="pro-img" style={s.photo ? { backgroundImage: "url(" + s.photo + ")" } : undefined}>
-        {s.km != null && <span className="mini">📍 Autour de vous • {s.km.toFixed(1)} km</span>}
+        {s.km != null && <span className="mini"><Ic n="pin" /> Autour de vous • {s.km.toFixed(1)} km</span>}
         {!s.photo && <span className="pro-letter">{initial(s.nom)}</span>}
-        {s.premium && <span className="prem">👑 PREMIUM</span>}
+        {s.premium && <span className="prem"><Ic n="crown" /> PREMIUM</span>}
         <div className="glass info"><b>{s.nom}{s.premium && " • PREMIUM"}</b>
           <div>{s.categorie} • {s.quartier}, {s.ville}</div>
           <div className="meta">{s.description?.slice(0, 50)}{s.dispo && <span><span className="dot" />Disponible maintenant</span>}</div></div>
       </Link>
-      <div className="row"><a className="btn-g" href={"tel:" + s.whatsapp}>📞 Appeler</a><a className="btn-g wa" href={waLink(s.whatsapp)} target="_blank" rel="noreferrer">WhatsApp</a></div>
+      <div className="row"><a className="btn-g" href={"tel:" + s.whatsapp}><Ic n="phone" /> Appeler</a><a className="btn-g wa" href={waLink(s.whatsapp)} target="_blank" rel="noreferrer">WhatsApp</a></div>
     </div>
   );
 }
@@ -57,11 +59,11 @@ export function Home({ user }) {
   return (
     <div className="wrap">
       <div className="row between">
-        <div><h1 className="hello">Bonjour,<br />{prenom} 👋</h1><div className="sub">📍 {pays} • {ville}</div></div>
-        <Link to={user ? "/profil" : "/connexion"} className="ava-ring"><span className="c">{user?.photoURL ? <img src={user.photoURL} alt="" /> : (prenom || "?")[0].toUpperCase()}</span>{prenom || "Se connecter"}</Link>
+        <div><h1 className="hello">Bonjour,<br />{prenom} 👋</h1><div className="sub"><Ic n="pin" /> {pays} • {ville}</div></div>
+        <Link to={user ? "/profil" : "/connexion"} className="ava-ring"><span className="c">{user?.photoURL ? <img src={user.photoURL} alt="" /> : (prenom || "?")[0].toUpperCase()}</span><i className="bolt"><Ic n="bolt" /></i>{prenom || "Se connecter"}</Link>
       </div>
-      <div className="glass pill"><span>🔍</span><input placeholder="Rechercher un service…" value={q} onChange={(e) => setQ(e.target.value)} /><button className="mic" onClick={() => voice(setQ)}>🎤<small>Voix</small></button></div>
-      <div className="orbs"><Link to="/taxi" className="orb">🚗<b>Taxi</b></Link><Link to="/livraison" className="orb">📦<b>Livraison</b></Link><Link to="/urgence" className="orb sos">🛡️<b>Urgence SOS</b></Link></div>
+      <div className="glass pill"><span><Ic n="search" /></span><input placeholder="Rechercher un service…" value={q} onChange={(e) => setQ(e.target.value)} /><button className="mic" onClick={() => voice(setQ)}><Ic n="mic" /><small>Voix</small></button></div>
+      <div className="orbs"><Link to="/taxi" className="orb"><Ic n="car" /><b>Taxi</b></Link><Link to="/livraison" className="orb"><Ic n="box" /><b>Livraison</b></Link><Link to="/urgence" className="orb sos"><Ic n="shield" /><b>Urgence SOS</b></Link></div>
       <StoriesBar />
       <h2>Catégories</h2>
       <div className="chips">
@@ -71,7 +73,7 @@ export function Home({ user }) {
       <div className="row" style={{ marginBottom: 8 }}>
         <select style={{ width: "auto", marginBottom: 0 }} value={pays} onChange={(e) => { localStorage.setItem("pays", e.target.value); setPays(e.target.value); setVille(PAYS[e.target.value].v[0]); }}>{Object.keys(PAYS).map((x) => <option key={x}>{x}</option>)}</select>
         <select style={{ width: "auto", marginBottom: 0 }} value={ville} onChange={(e) => setVille(e.target.value)}>{PAYS[pays].v.map((v) => <option key={v}>{v}</option>)}</select>
-        <button className="chip" onClick={() => navigator.geolocation.getCurrentPosition((x) => setPos({ lat: x.coords.latitude, lng: x.coords.longitude }), () => alert("Active le GPS pour trier par distance."))}>📍 Plus proches</button>
+        <button className="chip" onClick={() => navigator.geolocation.getCurrentPosition((x) => setPos({ lat: x.coords.latitude, lng: x.coords.longitude }), () => alert("Active le GPS pour trier par distance."))}><Ic n="pin" /> Plus proches</button>
         {cat === "Hôtel" && EQUIP.map((e) => <button key={e} className={"chip" + (equip.includes(e) ? " on" : "")} onClick={() => setEquip(equip.includes(e) ? equip.filter((x) => x !== e) : [...equip, e])}>{e}</button>)}
       </div>
       {cat === "Hôtel" && <input type="number" placeholder="Prix maximum (F)" value={maxp} onChange={(e) => setMaxp(e.target.value)} />}
@@ -132,7 +134,7 @@ export function ShopPage({ user }) {
   return (
     <div className="wrap">
       <div className="cover" style={shop.photo ? { backgroundImage: "url(" + shop.photo + ")" } : undefined}>
-        <div className="topbar"><button className="rb" onClick={() => nav(-1)}>‹</button><span className="glass titlebar">Boutique</span><button className="rb" onClick={() => (navigator.share ? navigator.share({ title: shop.nom, url: location.href }) : navigator.clipboard?.writeText(location.href))}>⤴</button></div>
+        <div className="topbar"><button className="rb" onClick={() => nav(-1)}><Ic n="back" /></button><span className="glass titlebar">Boutique</span><button className="rb" onClick={() => (navigator.share ? navigator.share({ title: shop.nom, url: location.href }) : navigator.clipboard?.writeText(location.href))}><Ic n="share" /></button></div>
       </div>
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
@@ -141,20 +143,20 @@ export function ShopPage({ user }) {
               <div className="meta">{shop.categorie} • {shop.quartier}, {shop.ville}</div>
               <div>{shop.premium && <span className="badge">PREMIUM</span>} {moy && <span><span className="star">★</span> {moy} ({reviews.length})</span>}</div>
             </div></div>
-          <button className={"heart" + (fav ? " on" : "")} onClick={toggleFav} aria-label="Favori">{fav ? "♥" : "♡"}</button>
+          <button className={"heart" + (fav ? " on" : "")} onClick={toggleFav} aria-label="Favori"><Ic n="heart" fill={fav} /></button>
         </div>
         <p>{shop.description}</p>
         {shop.horaires && <div className="meta">Horaires : {shop.horaires}</div>}
         <div className="row" style={{ marginTop: 10 }}>
           <a className="btn" href={"tel:" + shop.whatsapp}>Appeler</a>
           <a className="btn wa" href={waLink(shop.whatsapp)} target="_blank" rel="noreferrer">WhatsApp</a>
-          {!mine && user && <Link className="btn line" to={"/chat/" + id + "/" + user.uid}>💬 Écrire</Link>}
+          {!mine && user && <Link className="btn line" to={"/chat/" + id + "/" + user.uid}><Ic n="chat" /> Écrire</Link>}
         </div>
       </div>
 
       {mine && <StoryAdd shop={shop} />}
       <h2>Produits et services</h2>
-      {products.length === 0 && <div className="muted">Aucun produit pour le moment.</div>}
+      {products.length === 0 && <div className="card center"><img className="art pipe" src={ART.pipe} alt="" /><b>Aucun produit pour le moment</b><div className="meta">Ce commerçant n'a pas encore ajouté de produits ou services. Revenez bientôt !</div></div>}
       {products.map((x) => (
         <div className="card" key={x.id}>
           <div className="row" style={{ justifyContent: "space-between" }}>
@@ -179,7 +181,7 @@ export function ShopPage({ user }) {
 
       <h2>Avis</h2>
       {reviews.map((x) => (
-        <div className="card" key={x.id}><b>{x.auteur}</b>{x.verifie && <span className="ok"> ✔ Vérifié</span>} <span className="star">{"★".repeat(x.etoiles)}</span><div className="meta">{x.commentaire}</div></div>
+        <div className="card" key={x.id}><b>{x.auteur}</b>{x.verifie && <span className="ok"> <Ic n="check" /> Vérifié</span>} <span className="star">{"★".repeat(x.etoiles)}</span><div className="meta">{x.commentaire}</div></div>
       ))}
       <form className="card" onSubmit={addReview}>
         <select value={r.etoiles} onChange={(e) => setR({ ...r, etoiles: e.target.value })}>
@@ -241,28 +243,28 @@ export function Profile({ user }) {
   }, [user?.uid]);
   if (!user) return <div className="wrap"><div className="card muted">Connecte-toi pour voir ton profil.<br /><br /><Link className="btn" to="/connexion">Se connecter</Link></div></div>;
   const nom = user.displayName || user.email.split("@")[0];
-  const row = (to, ico, bg, txt) => <Link key={to} className="glass rowlink" to={to}><span className="ico" style={{ background: bg }}>{ico}</span><b>{txt}</b><span>›</span></Link>;
+  const row = (to, ico, bg, txt) => <Link key={to} className="glass rowlink" to={to}><span className="ico" style={{ background: bg }}><Ic n={ico} /></span><b>{txt}</b><span>›</span></Link>;
   return (
     <div className="wrap">
       <div className="row between" style={{ marginBottom: 14 }}><span style={{ width: 90 }} /><b style={{ letterSpacing: ".15em" }}>NOVA-TOGO</b>
-        <span className="row" style={{ flexWrap: "nowrap" }}><Link className="rb" style={{ display: "grid", placeItems: "center", textDecoration: "none" }} to="/messages">🔔</Link><Link className="rb" style={{ display: "grid", placeItems: "center", textDecoration: "none" }} to="/parametres">⚙️</Link></span></div>
+        <span className="row" style={{ flexWrap: "nowrap" }}><Link className="rb" style={{ display: "grid", placeItems: "center", textDecoration: "none" }} to="/messages"><Ic n="bell" /></Link><Link className="rb" style={{ display: "grid", placeItems: "center", textDecoration: "none" }} to="/parametres"><Ic n="gear" /></Link></span></div>
       <div className="glass panel" style={{ position: "relative" }}>
         <div className="row" style={{ flexWrap: "nowrap" }}><div className="avatar" style={{ width: 84, height: 84, fontSize: 38 }}>{nom[0].toUpperCase()}</div><div><b style={{ fontSize: 22 }}>{nom}</b><div className="meta">{user.email}</div></div></div>
-        <span className="badge" style={{ position: "absolute", top: 14, right: 14 }}>✦ {cmd.pts} POINTS NOVA</span>
-        <div className="glass stats"><div>Commandes<b>📦 {cmd.n}</b></div><div>Points<b>☆ {cmd.pts}</b></div><div>Boutiques<b>🏪 {mes.length}</b></div></div>
+        <span className="badge" style={{ position: "absolute", top: 14, right: 14 }}><Ic n="sparkle" /> {cmd.pts} POINTS NOVA</span>
+        <div className="glass stats"><div>Commandes<b><Ic n="box" /> {cmd.n}</b></div><div>Points<b><Ic n="star" /> {cmd.pts}</b></div><div>Boutiques<b><Ic n="store" /> {mes.length}</b></div></div>
       </div>
       <div className="sub" style={{ margin: "6px 4px" }}>Mon compte</div>
-      {row("/commandes", "📦", "linear-gradient(135deg,#7C3AED,#3B82F6)", "Mes commandes et points NOVA")}
-      {row("/messages", "💬", "linear-gradient(135deg,#6366F1,#7C3AED)", "Mes messages")}
-      {row("/parametres", "⚙️", "linear-gradient(135deg,#16A34A,#4ADE80)", "Paramètres")}
-      <a className="glass rowlink" target="_blank" rel="noreferrer" href={"https://wa.me/?text=" + encodeURIComponent("Télécharge NOVA-TOGO, l'app pour trouver tout au Togo : taxi, hôtel, pharmacie, marché, livraison. " + location.href.split("#")[0] + "#/?ref=" + user.uid)}><span className="ico" style={{ background: "#22C55E" }}>📱</span><b>Inviter un ami sur WhatsApp</b><span>›</span></a>
+      {row("/commandes", "box", "linear-gradient(135deg,#7C3AED,#3B82F6)", "Mes commandes et points NOVA")}
+      {row("/messages", "chat", "linear-gradient(135deg,#6366F1,#7C3AED)", "Mes messages")}
+      {row("/parametres", "gear", "linear-gradient(135deg,#16A34A,#4ADE80)", "Paramètres")}
+      <a className="glass rowlink" target="_blank" rel="noreferrer" href={"https://wa.me/?text=" + encodeURIComponent("Télécharge NOVA-TOGO, l'app pour trouver tout au Togo : taxi, hôtel, pharmacie, marché, livraison. " + location.href.split("#")[0] + "#/?ref=" + user.uid)}><span className="ico" style={{ background: "#22C55E" }}><Ic n="whatsapp" /></span><b>Inviter un ami sur WhatsApp</b><span>›</span></a>
       <div className="sub" style={{ margin: "10px 4px 6px" }}>Boutique</div>
       <div className="dash">
-        <div className="row"><span className="ico" style={{ background: "linear-gradient(135deg,#EF4444,#FF6B35)" }}>🏪</span><div><b style={{ fontSize: 19 }}>Mes boutiques</b>{mes.length === 0 && <div className="meta">Pas encore de boutique</div>}</div></div>
-        {mes.map((s) => <div key={s.id} style={{ margin: "8px 0" }}><Link className="link" to={"/boutique/" + s.id}>{s.nom}</Link> <span className="meta">{s.statut === "valide" ? "✅ Visible" : "⏳ En attente (24 h)"}</span></div>)}
+        <div className="row"><span className="ico" style={{ background: "linear-gradient(135deg,#EF4444,#FF6B35)" }}><Ic n="store" /></span><div><b style={{ fontSize: 19 }}>Mes boutiques</b>{mes.length === 0 && <div className="meta">Pas encore de boutique</div>}</div></div>
+        {mes.map((s) => <div key={s.id} style={{ margin: "8px 0" }}><Link className="link" to={"/boutique/" + s.id}>{s.nom}</Link> <span className="meta">{s.statut === "valide" ? <><Ic n="check" /> Visible</> : <><Ic n="clock" /> En attente (24 h)</>}</span></div>)}
         <Link className="btn big" to="/devenir-commercant" style={{ marginTop: 10 }}>+ En créer une</Link>
       </div>
-      {user.email === ADMIN_EMAIL && <><div className="sub" style={{ margin: "6px 4px" }}>Administration</div>{row("/admin", "🛡️", "linear-gradient(135deg,#7C3AED,#A78BFA)", "Panneau admin")}</>}
+      {user.email === ADMIN_EMAIL && <><div className="sub" style={{ margin: "6px 4px" }}>Administration</div>{row("/admin", "shield", "linear-gradient(135deg,#7C3AED,#A78BFA)", "Panneau admin")}</>}
       <button className="btn red big" style={{ marginTop: 14 }} onClick={() => signOut(auth)}>Se déconnecter</button>
     </div>
   );
@@ -295,7 +297,7 @@ export function NewShop({ user }) {
       <input required placeholder="Quartier" value={f.quartier} onChange={set("quartier")} />
       <textarea rows={3} placeholder="Description" value={f.description} onChange={set("description")} />
       <input placeholder="Horaires (ex : 8h - 18h)" value={f.horaires} onChange={set("horaires")} />
-      <button type="button" className="btn line" style={{ marginBottom: 10 }} onClick={() => navigator.geolocation.getCurrentPosition((p) => setF({ ...f, lat: p.coords.latitude, lng: p.coords.longitude }), () => alert("Active le GPS."))}>{f.lat ? "✅ Position enregistrée" : "📍 Enregistrer la position de ma boutique"}</button>
+      <button type="button" className="btn line" style={{ marginBottom: 10 }} onClick={() => navigator.geolocation.getCurrentPosition((p) => setF({ ...f, lat: p.coords.latitude, lng: p.coords.longitude }), () => alert("Active le GPS."))}>{f.lat ? <><Ic n="check" /> Position enregistrée</> : <><Ic n="pin" /> Enregistrer la position de ma boutique</>}</button>
       {f.categorie === "Hôtel" && <div className="card"><b>Hôtel</b><input type="number" placeholder="Prix de la chambre la moins chère (F)" value={f.prix_min} onChange={set("prix_min")} /><div className="chips">{EQUIP.map((e) => <button type="button" key={e} className={"chip" + (f.equip.includes(e) ? " on" : "")} onClick={() => setF({ ...f, equip: f.equip.includes(e) ? f.equip.filter((x) => x !== e) : [...f.equip, e] })}>{e}</button>)}</div></div>}
       <label className="meta">Photo de la boutique (facultatif)<input type="file" accept="image/*" onChange={async (e) => e.target.files[0] && setF({ ...f, photo: await compress(e.target.files[0]) })} /></label>
       {f.photo && <img src={f.photo} alt="" style={{ width: 90, borderRadius: 12, marginBottom: 10 }} />}
@@ -322,13 +324,13 @@ export function Favorites({ user }) {
       <h1 className="hello big">Mes favoris</h1>
       {l.length === 0 ? (
         <div className="center">
-          <svg viewBox="0 0 100 90" width="190"><defs><linearGradient id="hg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FFD6E0" /><stop offset=".5" stopColor="#FF9E80" /><stop offset="1" stopColor="#C77DFF" /></linearGradient></defs><path d="M50 85 L8 40 Q-2 20 18 8 Q38 0 50 22 Q62 0 82 8 Q102 20 92 40 Z" fill="url(#hg)" stroke="#fff" strokeOpacity=".7" strokeWidth="1.5" /><path d="M50 22 L30 8 M50 22 L70 8 M50 22 L50 85 M8 40 L50 22 L92 40" stroke="#fff" strokeOpacity=".5" fill="none" /></svg>
+          <img className="art heart-art" src={ART.heart} alt="" />
           <h2>Aucun favori</h2><div className="sub">Touche le cœur sur une boutique pour l'ajouter ici</div>
         </div>
       ) : l.map((x) => <Link key={x.id} className="glass rowlink" to={"/boutique/" + x.id}><b>{x.nom}</b><span>›</span></Link>)}
-      {d.length > 0 && <div className="glass panel"><div className="eyebrow">✦ À DÉCOUVRIR À {ville.toUpperCase()} ✦</div>
+      {d.length > 0 && <div className="glass panel"><div className="eyebrow"><Ic n="sparkle" /> À DÉCOUVRIR À {ville.toUpperCase()} <Ic n="sparkle" /></div>
         <div className="two">{d.map((s) => <Link key={s.id} className="glass mini-card" to={"/boutique/" + s.id}><Avatar s={s} /><b style={{ display: "block", marginTop: 8 }}>{s.nom}</b><div className="meta">{s.categorie} • {s.quartier}</div></Link>)}</div></div>}
-      <Link className="btn big" to="/" style={{ marginTop: 14 }}>✦ Explorer les boutiques</Link>
+      <Link className="btn big" to="/" style={{ marginTop: 14 }}><Ic n="sparkle" /> Explorer les boutiques</Link>
     </div>
   );
 }
@@ -343,17 +345,17 @@ export function Admin({ user }) {
   return (
     <div className="wrap">
       <div className="center"><div className="sub">Admin · NOVA-TOGO</div><h1 className="hello">Tableau de bord</h1></div>
-      <div className="tiles">{[["🏪", shops.length, "Boutiques"], ["⏳", wait, "En attente"], ["👑", prem, "Premium"]].map(([ic, n, lb]) => <div className="glass tile" key={lb}><div style={{ fontSize: 28 }}>{ic}</div><b>{n}</b>{lb}</div>)}</div>
-      <div className="banner"><div className="crown">👑</div><div><span className="chip on">Revenu Premium estimé</span><div className="big">{fmt(prem * 5000)} / mois</div></div></div>
+      <div className="tiles">{[["store", shops.length, "Boutiques"], ["clock", wait, "En attente"], ["crown", prem, "Premium"]].map(([ic, n, lb]) => <div className="glass tile" key={lb}><div style={{ fontSize: 28 }}><Ic n={ic} /></div><b>{n}</b>{lb}</div>)}</div>
+      <div className="banner"><div className="crown"><Ic n="crown" /></div><div><span className="chip on">Revenu Premium estimé</span><div className="big">{fmt(prem * 5000)} / mois</div></div></div>
       <div className="row between"><h2>Boutiques</h2><Link className="link" to="/devenir-commercant">+ Ajouter</Link></div>
       {shops.map((s, i) => (
         <div className="card" key={s.id}>
           <div className="row" style={{ flexWrap: "nowrap" }}><Avatar s={s} /><div><b style={{ fontSize: 20 }}>Boutique {i + 1}</b><div className="meta">{s.nom} — {s.categorie} · {s.ville}</div></div></div>
-          <div className="row" style={{ margin: "10px 0" }}><span className={"chip" + (s.statut === "valide" ? " okc" : "")}>{s.statut === "valide" ? "✔ Valide" : "⏳ En attente"}</span>{s.premium && <span className="chip gold">👑 Premium</span>}<span className="chip">📞 {s.whatsapp}</span></div>
+          <div className="row" style={{ margin: "10px 0" }}><span className={"chip" + (s.statut === "valide" ? " okc" : "")}>{s.statut === "valide" ? <><Ic n="check" /> Valide</> : <><Ic n="clock" /> En attente</>}</span>{s.premium && <span className="chip gold"><Ic n="crown" /> Premium</span>}<span className="chip"><Ic n="phone" /> {s.whatsapp}</span></div>
           <div className="row">
             {s.statut !== "valide" && <button className="btn sm" onClick={() => act(s.id, { statut: "valide" })}>Valider</button>}
-            <button className={"btn sm" + (s.premium ? " gold" : "")} onClick={() => act(s.id, { premium: !s.premium })}>{s.premium ? "★ Retirer Premium" : "+ Mettre Premium"}</button>
-            <button className="btn sm line" onClick={async () => { if (confirm("Supprimer ?")) { await deleteDoc(doc(db, "shops", s.id)); load(); } }}>🗑 Supprimer</button>
+            <button className={"btn sm" + (s.premium ? " gold" : "")} onClick={() => act(s.id, { premium: !s.premium })}>{s.premium ? <><Ic n="star" fill /> Retirer Premium</> : <><Ic n="plus" /> Mettre Premium</>}</button>
+            <button className="btn sm line" onClick={async () => { if (confirm("Supprimer ?")) { await deleteDoc(doc(db, "shops", s.id)); load(); } }}><Ic n="trash" /> Supprimer</button>
           </div>
         </div>
       ))}

@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Ic } from "./icons.jsx";
+import { ART } from "./assets.js";
 import { Link, useParams } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, serverTimestamp, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { auth, db } from "./firebase";
@@ -14,7 +16,7 @@ export const initTheme = () => {
 export function ThemeBtn() {
   const [t, setT] = useState(document.documentElement.dataset.theme);
   const go = () => { const n = t === "dark" ? "light" : "dark"; localStorage.setItem("theme", n); document.documentElement.dataset.theme = n; setT(n); };
-  return <button className="heart" onClick={go} aria-label="Mode sombre ou clair">{t === "dark" ? "☀️" : "🌙"}</button>;
+  return <button className="heart" onClick={go} aria-label="Mode sombre ou clair"><Ic n={t === "dark" ? "sun" : "moon"} /></button>;
 }
 export const Avatar = ({ s }) => s.photo
   ? <img className="avatar" src={s.photo} alt="" />
@@ -78,14 +80,15 @@ export function Taxi({ kind = "Taxi" }) {
     <div className="wrap">
       <h1 className="hello">{kind === "Taxi" ? "Où vas-tu ?" : "Je veux être livré"}</h1>
       <div className="sub" style={{ marginBottom: 12 }}>{ville}, Togo • Aujourd'hui</div>
+      <img className="art map" src={ART.map} alt="" />
       <div className="glass panel">
         <select value={ville} onChange={(e) => setVille(e.target.value)}>{VILLES.map((v) => <option key={v}>{v}</option>)}</select>
-        <input placeholder="📍 Où es-tu ? (quartier, repère)" value={f.depart} onChange={(e) => setF({ ...f, depart: e.target.value })} />
-        <input placeholder="📍 Où vas-tu ?" value={f.dest} onChange={(e) => setF({ ...f, dest: e.target.value })} />
-        {kind === "Taxi" && <div className="row">{[["Taxi Moto", "🏍️ Taxi Moto"], ["Taxi", "🚕 Taxi"], ["Taxi Voiture", "🚗 Taxi Voiture"]].map(([k, lb]) => <button key={k} className={"chip" + (typ === k ? " on" : "")} onClick={() => setTyp(k)}>{lb}</button>)}</div>}
+        <input placeholder=" Où es-tu ? (quartier, repère)" value={f.depart} onChange={(e) => setF({ ...f, depart: e.target.value })} />
+        <input placeholder=" Où vas-tu ?" value={f.dest} onChange={(e) => setF({ ...f, dest: e.target.value })} />
+        {kind === "Taxi" && <div className="row">{[["Taxi Moto", "moto"], ["Taxi", "car"], ["Taxi Voiture", "car"]].map(([k, ic]) => <button key={k} className={"chip" + (typ === k ? " on" : "")} onClick={() => setTyp(k)}><Ic n={ic} /> {k}</button>)}</div>}
       </div>
       {shown.length === 0 && (
-        <div className="center"><div style={{ fontSize: 80 }}>{kind === "Taxi" ? "🚕" : "🛵"}</div>
+        <div className="center"><img className="art taxi-art" src={ART.taxi} alt="" />
           <h2>Aucun {kind === "Taxi" ? "taximan" : "livreur"} à {ville} pour le moment</h2>
           <div className="sub">Sois le premier à proposer tes trajets et rejoins nos conducteurs.</div>
           <Link className="btn big" to="/devenir-commercant" style={{ marginTop: 14 }}>Inscris-toi dans Ma boutique, catégorie {kind === "Taxi" ? "Taxi Moto ou Taxi Voiture" : "Livreur"}</Link></div>
@@ -154,11 +157,11 @@ export function Orders({ user }) {
       <div className="hero"><h1>{pts} points NOVA</h1>Niveau : <b>{niv}</b> • {refs} ami(s) invité(s) (+20 points chacun)<div style={{ fontSize: 13, marginTop: 6 }}>100 F dépensés = 1 point (commande livrée). 100 points = 1 livraison offerte, 200 points = 1 plat offert chez un partenaire.</div></div>
       <h2>Mes commandes</h2>
       {mine.length === 0 && <div className="muted">Aucune commande pour le moment.</div>}
-      {mine.map((o) => <div className="card" key={o.id}><b>{o.produit}</b> <span className="prix">{fmt(o.total)}</span><div className="meta">{o.shopNom} • {o.livraison ? "Livraison" : "Retrait"} • {o.statut === "livree" ? "✅ Livrée" : "⏳ Envoyée"}</div></div>)}
+      {mine.map((o) => <div className="card" key={o.id}><b>{o.produit}</b> <span className="prix">{fmt(o.total)}</span><div className="meta">{o.shopNom} • {o.livraison ? "Livraison" : "Retrait"} • {o.statut === "livree" ? <><Ic n="check" /> Livrée</> : <><Ic n="clock" /> Envoyée</>}</div></div>)}
       {recv.length > 0 && <h2>Commandes reçues</h2>}
       {recv.map((o) => (
         <div className="card" key={o.id}><b>{o.produit}</b> <span className="prix">{fmt(o.total)}</span>
-          <div className="meta">{o.client} • {o.livraison ? "Livraison : " + o.adresse : "Retrait"} • {o.statut === "livree" ? "✅ Livrée" : "⏳ À livrer"}</div>
+          <div className="meta">{o.client} • {o.livraison ? "Livraison : " + o.adresse : "Retrait"} • {o.statut === "livree" ? <><Ic n="check" /> Livrée</> : <><Ic n="clock" /> À livrer</>}</div>
           {o.statut !== "livree" && <button className="btn sm" style={{ marginTop: 8 }} onClick={() => set(o.id, "livree")}>Marquer livrée</button>}
         </div>))}
     </div>
@@ -181,7 +184,7 @@ export function Chat({ user }) {
   if (!user) return <div className="wrap"><div className="card muted">Connecte-toi pour écrire.</div></div>;
   const send = async (e) => { e.preventDefault(); if (!t.trim()) return; await addDoc(collection(db, "chats", cid, "msgs"), { from: user.uid, text: t, date: serverTimestamp() }); setT(""); };
   return (
-    <div className="wrap"><h2>💬 {nom}</h2>
+    <div className="wrap"><h2><Ic n="chat" /> {nom}</h2>
       {msgs.map((m) => <div key={m.id} style={{ display: "flex", justifyContent: m.from === user.uid ? "flex-end" : "flex-start" }}><div className="card" style={{ maxWidth: "80%", marginBottom: 8, background: m.from === user.uid ? "var(--violet)" : "var(--card)", color: m.from === user.uid ? "#fff" : "var(--ink)" }}>{m.text}</div></div>)}
       <form className="row" onSubmit={send}><input style={{ flex: 1, marginBottom: 0 }} placeholder="Ton message" value={t} onChange={(e) => setT(e.target.value)} /><button className="btn">Envoyer</button></form>
     </div>

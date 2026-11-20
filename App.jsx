@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Ic } from "./icons.jsx";
 import { Routes, Route, Link, NavLink } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "./firebase";
@@ -41,8 +42,8 @@ export default function App() {
         <Route path="/admin" element={<Admin user={user} />} />
       </Routes>
       <nav className="bar">
-        {[["/", "🏠", "Accueil"], ["/commandes", "📋", "Commandes"], ["/favoris", "❤️", "Favoris"], ["/messages", "💬", "Chat"], ["/profil", "👤", "Profil"]].map(([to, ic, lb]) => (
-          <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => (isActive ? "on" : "")}><span>{ic}</span>{t(lb)}</NavLink>
+        {[["/", "home", "Accueil"], ["/commandes", "list", "Commandes"], ["/favoris", "heart", "Favoris"], ["/messages", "chat", "Chat"], ["/profil", "user", "Profil"]].map(([to, ic, lb]) => (
+          <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => (isActive ? "on" : "")}><span><Ic n={ic} /></span>{t(lb)}</NavLink>
         ))}
       </nav>
     </div>

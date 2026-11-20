@@ -65,3 +65,20 @@ nav.bar a.on{color:#FFA070}nav.bar a span{display:block;font-size:22px}
 .banner{display:flex;gap:14px;align-items:center;padding:18px;border-radius:28px;margin-bottom:16px;background:linear-gradient(135deg,rgba(124,58,237,.95),rgba(255,107,53,.9));border:1px solid var(--edge);color:#fff}
 .crown{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-size:32px;background:rgba(255,255,255,.2)}.banner .big{font-size:30px;font-weight:900;color:#FFD9BF;margin-top:6px}
 .dash{border:2px dashed var(--edge);border-radius:28px;padding:16px;margin-bottom:14px}
+.ic{flex:none}
+.orb svg{width:40px;height:40px}.mic svg{width:22px;height:22px}.rowlink .ico svg{color:#fff}
+.ava-ring{position:relative}.bolt{position:absolute;top:64px;right:2px;width:34px;height:34px;border-radius:50%;background:#7C3AED;display:grid;place-items:center;color:#FFC9A8;border:2px solid var(--edge);font-style:normal}
+.art{display:block;margin:0 auto;max-width:100%;-webkit-mask-image:radial-gradient(ellipse at center,#000 52%,transparent 74%);mask-image:radial-gradient(ellipse at center,#000 52%,transparent 74%)}
+.heart-art{width:230px;animation:float 5s ease-in-out infinite}.taxi-art{width:270px}.pipe{width:130px}
+.art.map{width:100%;border-radius:34px;margin-bottom:14px;-webkit-mask-image:none;mask-image:none;border:1px solid var(--edge)}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{box-shadow:0 0 12px #FF6B3588}50%{box-shadow:0 0 26px #FF6B35}}
+@keyframes drift{from{background-position:0 0,40px 60px}to{background-position:0 -420px,40px -360px}}
+.orb{animation:float 4s ease-in-out infinite}.orb:nth-child(2){animation-delay:.6s}.orb:nth-child(3){animation-delay:1.2s}
+.pro,.card,.rowlink,.tile,.panel,.banner{animation:rise .5s ease both}
+.mic{animation:pulse 2.4s infinite}
+.btn,.btn-g,.chip,.orb,.rowlink,.rb{transition:transform .15s}
+.btn:active,.btn-g:active,.chip:active,.orb:active,.rowlink:active,.rb:active{transform:scale(.95)}
+.app::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:radial-gradient(circle,#ffffff66 1.5px,transparent 2px),radial-gradient(circle,#FFB38A77 2px,transparent 3px);background-size:90px 90px,140px 140px;animation:drift 40s linear infinite;opacity:.55}
+.app>*{position:relative}
