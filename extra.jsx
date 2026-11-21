@@ -259,8 +259,8 @@ export const gps = (ok) => {
 };
 
 export const useSettings = () => {
-  const [s, setS] = useState({ premium: 1000, whatsapp: "", email: ADMIN_EMAIL, flooz: "" });
-  useEffect(() => { getDoc(doc(db, "settings", "app")).then((d) => d.exists() && setS((o) => ({ ...o, ...d.data() }))).catch(() => {}); }, []);
+  const [s, setS] = useState({ premium: 1000, whatsapp: "+22872230580", email: ADMIN_EMAIL, flooz: "" });
+  useEffect(() => { getDoc(doc(db, "settings", "app")).then((d) => d.exists() && setS((o) => { const x = { ...o, ...d.data() }; return { ...x, whatsapp: x.whatsapp || o.whatsapp, email: x.email || o.email }; })).catch(() => {}); }, []);
   return s;
 };
 

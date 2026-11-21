@@ -2,86 +2,149 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ⚠️ Remplace par TON email admin (le même que dans src/firebaseConfig.js)
+    // ---------- Fonctions utiles ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+    // Administrateur : le même email que ADMIN_EMAIL dans firebaseConfig.js
     function isAdmin() {
-      return request.auth != null && request.auth.token.email == "pilotepower2@gmail.com";
+      return signedIn() && request.auth.token.email == "pilotepower2@gmail.com";
     }
 
+    // ---------- BOUTIQUES ----------
     match /shops/{shopId} {
+      // Tout le monde voit les boutiques validées. Le propriétaire et l'admin voient les autres.
       allow read: if resource.data.statut == "valide"
-                  || (request.auth != null && resource.data.ownerId == request.auth.uid)
+                  || (signedIn() && resource.data.ownerId == request.auth.uid)
                   || isAdmin();
-      allow create: if request.auth != null
+
+      // Inscription : la boutique démarre toujours « en_attente » et non Premium.
+      allow create: if signedIn()
                     && request.resource.data.ownerId == request.auth.uid
                     && request.resource.data.statut == "en_attente"
                     && request.resource.data.premium == false;
+
       allow update: if isAdmin()
-                    || (request.auth != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["noteSum", "noteCount"]))
-                    || (request.auth != null
+                    // Le propriétaire modifie sa boutique, sauf les champs protégés.
+                    || (signedIn()
                         && resource.data.ownerId == request.auth.uid
-                        && request.resource.data.statut == resource.data.statut
-                        && request.resource.data.premium == resource.data.premium
-                        && request.resource.data.ownerId == resource.data.ownerId);
+                        && !request.resource.data.diff(resource.data).affectedKeys()
+                             .hasAny(["statut", "premium", "premium_fin", "ownerId", "noteSum", "noteCount"]))
+                    // Tout utilisateur connecté met à jour la note moyenne (un avis = +1, étoiles de 1 à 5).
+                    || (signedIn()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["noteSum", "noteCount"])
+                        && request.resource.data.noteCount == resource.data.get("noteCount", 0) + 1
+                        && request.resource.data.noteSum - resource.data.get("noteSum", 0) >= 1
+                        && request.resource.data.noteSum - resource.data.get("noteSum", 0) <= 5);
+
       allow delete: if isAdmin();
 
-      match /products/{pid} {
+      // ----- Produits et photos d'articles -----
+      match /products/{productId} {
         allow read: if true;
-        allow write: if request.auth != null
-          && (get(/databases/$(database)/documents/shops/$(shopId)).data.ownerId == request.auth.uid || isAdmin());
+        allow write: if signedIn()
+                     && (get(/databases/$(database)/documents/shops/$(shopId)).data.ownerId == request.auth.uid
+                         || isAdmin());
       }
-      match /reviews/{rid} {
+
+      // ----- Avis -----
+      match /reviews/{reviewId} {
         allow read: if true;
-        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid
-                      && request.resource.data.etoiles >= 1 && request.resource.data.etoiles <= 5;
-        allow delete: if isAdmin();
+        allow create: if signedIn()
+                      && request.resource.data.userId == request.auth.uid
+                      && request.resource.data.etoiles is number
+                      && request.resource.data.etoiles >= 1
+                      && request.resource.data.etoiles <= 5;
+        allow delete: if isAdmin()
+                      || (signedIn() && resource.data.userId == request.auth.uid);
       }
     }
 
-    match /orders/{oid} {
-      allow create: if request.auth != null && request.resource.data.clientId == request.auth.uid;
-      allow read: if (request.auth != null && (resource.data.clientId == request.auth.uid || resource.data.shopOwnerId == request.auth.uid)) || isAdmin();
-      allow update: if request.auth != null && resource.data.shopOwnerId == request.auth.uid
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["statut"]);
-    }
-
-    match /chats/{cid} {
-      allow read: if request.auth != null && (resource.data.clientId == request.auth.uid || resource.data.ownerId == request.auth.uid);
-      allow create, update: if request.auth != null && (request.resource.data.clientId == request.auth.uid || request.resource.data.ownerId == request.auth.uid);
-      match /msgs/{mid} {
-        allow read, create: if request.auth != null && (
-          cid.split("_")[1] == request.auth.uid ||
-          get(/databases/$(database)/documents/shops/$(cid.split("_")[0])).data.ownerId == request.auth.uid);
-      }
-    }
-
-    match /stories/{sid} {
-      allow read: if true;
-      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
-      allow delete: if (request.auth != null && resource.data.ownerId == request.auth.uid) || isAdmin();
-    }
-
-    match /referrals/{uid} {
-      allow create: if request.auth != null && request.auth.uid == uid && request.resource.data.parrainId != uid;
-      allow read: if request.auth != null && (request.auth.uid == uid || resource.data.parrainId == request.auth.uid);
-    }
-
-    match /settings/{sid} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
+    // ---------- UTILISATEURS ----------
     match /users/{uid} {
-      allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
-      allow write: if request.auth != null && request.auth.uid == uid;
+      // Chacun lit et modifie son propre compte. L'admin peut lire la liste des comptes.
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update, delete: if signedIn() && request.auth.uid == uid;
+
+      // Favoris
+      match /favorites/{favoriteId} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
     }
 
-    match /emergencies/{v} {
+    // ---------- COMMANDES ----------
+    match /orders/{orderId} {
+      allow create: if signedIn()
+                    && request.resource.data.clientId == request.auth.uid
+                    && request.resource.data.total is number
+                    && request.resource.data.total >= 0;
+      allow read: if signedIn()
+                  && (resource.data.clientId == request.auth.uid
+                      || resource.data.shopOwnerId == request.auth.uid
+                      || isAdmin());
+      // Le commerçant change seulement le statut (envoyée / livrée).
+      allow update: if signedIn()
+                    && resource.data.shopOwnerId == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["statut"])
+                    && request.resource.data.statut in ["envoyee", "livree"];
+      allow delete: if isAdmin();
+    }
+
+    // ---------- CHAT ----------
+    // Identifiant d'une conversation : idBoutique_idClient
+    match /chats/{chatId} {
+      allow read: if signedIn()
+                  && (resource.data.clientId == request.auth.uid
+                      || resource.data.ownerId == request.auth.uid);
+      allow create: if signedIn()
+                    && (request.resource.data.clientId == request.auth.uid
+                        || request.resource.data.ownerId == request.auth.uid);
+      allow update: if signedIn()
+                    && (resource.data.clientId == request.auth.uid
+                        || resource.data.ownerId == request.auth.uid);
+
+      match /msgs/{messageId} {
+        // Participants : le client (2e partie de l'identifiant) ou le propriétaire de la boutique (1re partie).
+        allow read: if signedIn()
+                    && (chatId.split("_")[1] == request.auth.uid
+                        || get(/databases/$(database)/documents/shops/$(chatId.split("_")[0])).data.ownerId == request.auth.uid);
+        allow create: if signedIn()
+                      && request.resource.data.from == request.auth.uid
+                      && request.resource.data.text is string
+                      && request.resource.data.text.size() <= 1000
+                      && (chatId.split("_")[1] == request.auth.uid
+                          || get(/databases/$(database)/documents/shops/$(chatId.split("_")[0])).data.ownerId == request.auth.uid);
+      }
+    }
+
+    // ---------- STORIES (24 h) ----------
+    match /stories/{storyId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid);
+    }
+
+    // ---------- URGENCES (numéros par ville) ----------
+    match /emergencies/{cityId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /users/{uid}/favorites/{fid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    // ---------- PARRAINAGE ----------
+    match /referrals/{uid} {
+      allow create: if signedIn()
+                    && request.auth.uid == uid
+                    && request.resource.data.parrainId != uid;
+      allow read: if signedIn()
+                  && (request.auth.uid == uid
+                      || resource.data.parrainId == request.auth.uid
+                      || isAdmin());
+    }
+
+    // ---------- RÉGLAGES DE L'APP (prix Premium, WhatsApp, email...) ----------
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }
