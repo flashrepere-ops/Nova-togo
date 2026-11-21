@@ -6,25 +6,33 @@ import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPass
 import { collection, doc, getDoc, getDocs, addDoc, setDoc, deleteDoc, updateDoc, increment, query, where, serverTimestamp } from "firebase/firestore";
 import { auth, db, google } from "./firebase";
 import { ADMIN_EMAIL } from "./firebaseConfig";
-import { VILLES, CATEGORIES, DOMAINES, DOM_OF, champsDe, PAYS, EQUIP, fmt, t } from "./data";
-import { Avatar, compress, voice, Price, orderProduct, StoriesBar, StoryAdd, km, PremiumCard, gps } from "./extra.jsx";
+import { VILLES, CATEGORIES, DOMAINES, DOM_OF, champsDe, PAYS, EQUIP, fmt, dist, t } from "./data";
+import { Avatar, compress, voice, Price, orderProduct, StoriesBar, StoryAdd, km, PremiumCard, gps, useWatch, MiniMap } from "./extra.jsx";
 
 const initial = (s) => (s || "?").trim().charAt(0).toUpperCase();
 const waLink = (n) => "https://wa.me/" + String(n || "").replace(/\D/g, "");
 const sorted = (l) => [...l].sort((a, b) => (b.premium ? 1 : 0) - (a.premium ? 1 : 0));
 
-function ShopCard({ s }) {
+function ShopCard({ s, pos, locate }) {
+  const eta = s.km != null ? Math.max(2, Math.round(((s.km * 1.3) / 25) * 60)) : null;
   return (
     <div className="pro">
-      <Link to={"/boutique/" + s.id} className="pro-img" style={s.photo ? { backgroundImage: "url(" + s.photo + ")" } : undefined}>
-        {s.km != null && <span className="mini"><Ic n="pin" /> Autour de vous • {s.km.toFixed(1)} km</span>}
-        {!s.photo && <span className="pro-letter">{initial(s.nom)}</span>}
-        {s.premium && <span className="prem"><Ic n="crown" /> PREMIUM</span>}
-        <div className="glass info"><b>{s.nom}{s.premium && " • PREMIUM"}</b>
-          <div>{s.categorie} • {s.quartier}, {s.ville}</div>
-          <div className="meta">{s.noteCount ? <span><Ic n="star" /> {(s.noteSum / s.noteCount).toFixed(1)} • {s.noteCount} avis</span> : "Nouveau"}{s.dispo && <span> <span className="dot" />Disponible maintenant</span>}</div></div>
-      </Link>
-      <div className="row"><a className="btn-g" href={"tel:" + s.whatsapp}><Ic n="phone" /> Appeler</a><a className="btn-g wa" href={waLink(s.whatsapp)} target="_blank" rel="noreferrer">WhatsApp</a></div>
+      <div className="pro-bg" style={s.photo ? { backgroundImage: "url(" + s.photo + ")" } : undefined}>{!s.photo && <span className="pro-letter">{initial(s.nom)}</span>}</div>
+      <Link to={"/boutique/" + s.id} className="pro-link" aria-label={s.nom} />
+      <MiniMap pos={pos} shop={s} label={"Autour de vous" + (s.km != null ? " • " + dist(s.km) : "")} onLocate={locate} />
+      <div className="glass info">
+        {s.premium && <span className="prem"><Ic n="crown" fill /> PREMIUM</span>}
+        <b>{s.nom}{s.premium && " • PREMIUM"}</b>
+        <div>{s.categorie} • {s.quartier}, {s.ville}</div>
+        <div className="info-row">
+          <span><Ic n="star" /> {s.noteCount ? (s.noteSum / s.noteCount).toFixed(1) + " • " + s.noteCount + " avis" : "Nouveau"}</span>
+          {s.dispo && <span><span className="dot" /> Disponible maintenant{eta ? " • ~" + eta + " min" : ""}</span>}
+        </div>
+      </div>
+      <div className="pro-actions">
+        <a className="btn-g" href={"tel:" + s.whatsapp}><Ic n="phone" /> Appeler</a>
+        <a className="btn-g wa" href={waLink(s.whatsapp)} target="_blank" rel="noreferrer"><Ic n="whatsapp" /> WhatsApp</a>
+      </div>
     </div>
   );
 }
@@ -34,7 +42,7 @@ export function Home({ user }) {
   const [cat, setCat] = useState("");
   const [dom, setDom] = useState("");
   const [pays, setPays] = useState(localStorage.getItem("pays") || "Togo");
-  const [pos, setPos] = useState(null);
+  const [pos, startGps] = useWatch();
   const [equip, setEquip] = useState([]);
   const [maxp, setMaxp] = useState("");
   const [q, setQ] = useState("");
@@ -72,7 +80,7 @@ export function Home({ user }) {
       <div className="row" style={{ marginBottom: 8 }}>
         <select style={{ width: "auto", marginBottom: 0 }} value={pays} onChange={(e) => { localStorage.setItem("pays", e.target.value); setPays(e.target.value); setVille(PAYS[e.target.value].v[0]); }}>{Object.keys(PAYS).map((x) => <option key={x}>{x}</option>)}</select>
         <select style={{ width: "auto", marginBottom: 0 }} value={ville} onChange={(e) => setVille(e.target.value)}>{PAYS[pays].v.map((v) => <option key={v}>{v}</option>)}</select>
-        <button className="chip" onClick={() => gps((x) => setPos({ lat: x.coords.latitude, lng: x.coords.longitude }))}><Ic n="pin" /> Plus proches</button>
+        <button className="chip" onClick={startGps}><Ic n="pin" /> Plus proches</button>
         {cat === "Hôtel" && EQUIP.map((e) => <button key={e} className={"chip" + (equip.includes(e) ? " on" : "")} onClick={() => setEquip(equip.includes(e) ? equip.filter((x) => x !== e) : [...equip, e])}>{e}</button>)}
       </div>
       {cat === "Hôtel" && <input type="number" placeholder="Prix maximum (F)" value={maxp} onChange={(e) => setMaxp(e.target.value)} />}
@@ -80,7 +88,7 @@ export function Home({ user }) {
       {loading && <div className="muted">Chargement…</div>}
       {err && <div className="err">{err}</div>}
       {!loading && !err && list.length === 0 && <div className="muted">Aucun commerçant ici pour le moment.<br /><Link className="link" to="/devenir-commercant">Inscris ta boutique gratuitement</Link></div>}
-      <div className="grid">{list.map((s) => <ShopCard key={s.id} s={s} />)}</div>
+      <div className="grid">{list.map((s) => <ShopCard key={s.id} s={s} pos={pos} locate={startGps} />)}</div>
     </div>
   );
 }

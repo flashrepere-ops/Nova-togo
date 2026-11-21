@@ -74,3 +74,5 @@ const DOMCH = {
   "Immobilier et logement": CHAMPS["Immobilier"],
 };
 export const champsDe = (c) => CHAMPS[c] || DOMCH[DOM_OF[c]] || [];
+
+export const dist = (k) => (k < 1 ? Math.round(k * 1000) + " m" : k.toFixed(1).replace(".", ",") + " km");

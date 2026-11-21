@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Ic } from "./icons.jsx";
 import { ART } from "./assets.js";
 import { Link, useParams } from "react-router-dom";
@@ -325,6 +325,47 @@ export function MesArticles({ user }) {
               {(p.photos || []).length < 5 && <input type="file" accept="image/*" onChange={async (e) => { if (e.target.files[0]) { await updateDoc(pd(sh.id, p.id), { photos: [...(p.photos || []), await compress(e.target.files[0])] }); load(); } }} />}
             </div>))}
         </div>))}
+    </div>
+  );
+}
+
+const GPS_BLOCK = "La localisation est bloquée pour ce site. Touche le cadenas à côté de l'adresse > Autorisations > Position > Autoriser, puis recharge la page. Vérifie aussi que le GPS du téléphone est activé.";
+
+// Position suivie en continu : elle se met à jour quand la personne se déplace.
+export function useWatch() {
+  const [pos, setPos] = useState(null);
+  const id = useRef(null);
+  const start = () => {
+    if (id.current != null) return;
+    if (!navigator.geolocation) return alert("Ce navigateur ne gère pas la localisation.");
+    id.current = navigator.geolocation.watchPosition(
+      (p) => setPos((o) => (o && Math.abs(o.lat - p.coords.latitude) < 4e-5 && Math.abs(o.lng - p.coords.longitude) < 4e-5 ? o : { lat: p.coords.latitude, lng: p.coords.longitude })),
+      (e) => { if (e.code === 1) { navigator.geolocation.clearWatch(id.current); id.current = null; alert(GPS_BLOCK); } },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 });
+  };
+  useEffect(() => {
+    navigator.permissions?.query({ name: "geolocation" }).then((r) => r.state === "granted" && start()).catch(() => {});
+    return () => { if (id.current != null) navigator.geolocation.clearWatch(id.current); };
+  }, []);
+  return [pos, start];
+}
+
+const Z = 15, MW = 196, MH = 112, CX = 98, CY = 71;
+const tileXY = (lat, lng) => { const n = 2 ** Z, r = (lat * Math.PI) / 180; return [((lng + 180) / 360) * n, ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n]; };
+
+// Mini-carte centrée sur la personne (épingle orange). La boutique apparaît si elle est dans le cadre.
+export function MiniMap({ pos, shop, label, onLocate }) {
+  if (!pos) return <button type="button" className="mini-map nomap" onClick={onLocate}><Ic n="pin" /> Touche pour voir la distance</button>;
+  const [fx, fy] = tileXY(pos.lat, pos.lng), ox = fx * 256 - CX, oy = fy * 256 - CY, tiles = [];
+  for (let x = Math.floor(ox / 256); x <= Math.floor((ox + MW) / 256); x++) for (let y = Math.floor(oy / 256); y <= Math.floor((oy + MH) / 256); y++) tiles.push([x, y]);
+  let sp = null;
+  if (shop.lat != null) { const [sx, sy] = tileXY(shop.lat, shop.lng), px = sx * 256 - ox, py = sy * 256 - oy; if (px > 8 && px < MW - 8 && py > 34 && py < MH - 8) sp = [px, py]; }
+  return (
+    <div className="mini-map">
+      <div className="mm-tiles">{tiles.map(([x, y]) => <img key={x + "_" + y} alt="" src={"https://tile.openstreetmap.org/" + Z + "/" + x + "/" + y + ".png"} style={{ left: x * 256 - ox, top: y * 256 - oy }} />)}</div>
+      <span className="mm-pulse" /><span className="mm-pin"><Ic n="pin" fill /></span>
+      {sp && <span className="mm-shop" style={{ left: sp[0], top: sp[1] }} />}
+      <span className="mm-label"><Ic n="pin" /> {label}</span><small className="mm-attr">© OpenStreetMap</small>
     </div>
   );
 }
